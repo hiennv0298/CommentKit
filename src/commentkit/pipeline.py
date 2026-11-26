@@ -249,6 +249,28 @@ def process_job(job, cfg, settings, log=print):
     return out_dir
 
 
+def move_to_trash(path):
+    """Chuyển file/thư mục vào Thùng rác của Windows (khôi phục lại được)."""
+    if not os.path.exists(path):
+        return
+    if os.name != "nt":
+        shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        _fields_ = [("hwnd", wintypes.HWND), ("wFunc", wintypes.UINT), ("pFrom", wintypes.LPCWSTR),
+                    ("pTo", wintypes.LPCWSTR), ("fFlags", ctypes.c_ushort), ("fAnyOperationsAborted", wintypes.BOOL),
+                    ("hNameMappings", ctypes.c_void_p), ("lpszProgressTitle", wintypes.LPCWSTR)]
+
+    fo_delete, flags = 3, 0x40 | 0x10 | 0x04 | 0x400   # ALLOWUNDO | NOCONFIRMATION | SILENT | NOERRORUI
+    op = SHFILEOPSTRUCTW(None, fo_delete, os.path.abspath(path) + "\0", None, flags, False, None, None)
+    rc = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(op))
+    if rc or op.fAnyOperationsAborted or os.path.exists(path):
+        raise OSError(f"Không chuyển được {os.path.basename(path)} vào Thùng rác (file đang mở ở chương trình khác?).")
+
+
 def list_outputs(output_dir, limit=60):
     res = []
     if not os.path.isdir(output_dir):

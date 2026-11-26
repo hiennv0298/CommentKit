@@ -389,6 +389,21 @@ def open_folder():
     return jsonify(ok=True)
 
 
+@app.post("/api/output/delete")
+def output_delete():
+    """Xoá một video đã làm: cả thư mục của nó (video, thumbnail, kịch bản) vào Thùng rác."""
+    name = os.path.basename((request.json or {}).get("name", ""))
+    d = os.path.join(W.settings["output_dir"], name)
+    if not name or name in (".", "..") or not os.path.isfile(os.path.join(d, "video.mp4")):
+        abort(404)
+    try:
+        P.move_to_trash(d)
+    except OSError as e:
+        return jsonify(ok=False, msg=str(e)), 409
+    W.log("Đã xoá video (vào Thùng rác):", name)
+    return jsonify(ok=True)
+
+
 @app.get("/media/<kind>/<path:p>")
 def media(kind, p):
     base = {"inbox": W.settings["inbox_dir"], "out": W.settings["output_dir"], "bg": W.settings["bg_dir"]}.get(kind)

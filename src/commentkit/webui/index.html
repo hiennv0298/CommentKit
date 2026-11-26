@@ -24,6 +24,8 @@ button{font:inherit;border:1px solid var(--line);background:var(--card2);color:v
 button:hover{border-color:#444857}
 button.pri{background:var(--acc);color:#111;border-color:var(--acc);font-weight:600}
 button.sm{padding:4px 9px;font-size:12px}
+button.del{color:var(--err)}
+button.del:hover{border-color:var(--err)}
 .sw{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
 .sw input{display:none}
 .sw i{width:38px;height:22px;border-radius:99px;background:#3a3d48;position:relative;transition:.2s}
@@ -277,6 +279,7 @@ async function refresh(){
         <button class="sm" data-copy="${esc(o.title)}">Chép tiêu đề</button>
         <button class="sm" data-copy="${esc((o.description||"") + "\n\n" + (o.tags||[]).map(t=>"#"+t.replace(/\s+/g,"")).join(" "))}">Chép mô tả</button>
         <button class="sm" data-openout="${esc(o.name)}">Thư mục</button>
+        <button class="sm del" data-delout="${esc(o.name)}" title="Chuyển video vào Thùng rác">Xoá</button>
       </div></div></div>`).join("") : `<div class="empty">Chưa có video nào.</div>`;
   }
 
@@ -341,6 +344,16 @@ document.body.addEventListener("click", async e => {
   else if (t.dataset.retry){ await post("/api/retry", {name:t.dataset.retry}); toast("Đưa lại vào hàng chờ"); refresh(); }
   else if (t.dataset.bgdel){ if (confirm("Xoá video nền " + t.dataset.bgdel + "?")) { await post("/api/bg/delete", {name:t.dataset.bgdel}); refresh(); } }
   else if (t.dataset.copy !== undefined){ await navigator.clipboard.writeText(t.dataset.copy); toast("Đã chép"); }
+  else if (t.dataset.delout){
+    const card = t.closest(".vid"), title = card.querySelector(".tt").textContent;
+    if (!confirm(`Xoá video "${title}"?
+Cả thư mục của video (video, thumbnail, kịch bản) sẽ vào Thùng rác, khôi phục lại được.`)) return;
+    const v = card.querySelector("video"); v.pause(); v.removeAttribute("src"); v.load();   // nhả file để Windows xoá được
+    const r = await post("/api/output/delete", {name:t.dataset.delout});
+    if (r.ok) { card.remove(); toast("Đã chuyển video vào Thùng rác"); }
+    else toast(r.msg || "Không xoá được");
+    shownOutputs = ""; refresh();
+  }
   else if (t.dataset.openout){ post("/api/open", {kind:"output", name:t.dataset.openout}); }
   else if (t.dataset.open){ post("/api/open", {kind:t.dataset.open}); }
   else if (t.matches(".thumbs img")){ const lb=$("#lightbox"); lb.querySelector("img").src=t.src; lb.style.display="flex"; }

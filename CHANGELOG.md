@@ -3,6 +3,12 @@
 Mục của mỗi phiên bản là ghi chú phát hành trên trang GitHub Releases.
 Thêm mục `## <phiên bản>` ở đây trước khi đẩy tag `v<phiên bản>`.
 
+## 0.1.2
+
+- **Nút Xoá video** trên mỗi video đã làm: cả thư mục của video (video, thumbnail, kịch bản) vào Thùng rác của Windows, khôi phục lại được.
+- Bản đầu tiên cập nhật được ngay trong app: từ 0.1.1, bấm **Cập nhật ngay** trên thanh báo màu vàng.
+- Mở CommentKit lần nữa khi app đang chạy ẩn (`COMMENTKIT_NO_WINDOW`) không còn bật thêm cửa sổ.
+
 ## 0.1.1
 
 - **Tự cập nhật trong app.** CommentKit kiểm tra GitHub có bản mới không khi mở app và vài tiếng một lần, rồi hiện thanh báo kèm ghi chú phát hành. Với bản cài bằng bộ cài, nút **Cập nhật ngay** tải bộ cài mới, đối chiếu mã SHA-256, cài im lặng rồi mở lại CommentKit. Cửa sổ đang mở tự tải lại vào bản mới, không mở thêm cửa sổ thứ hai.

@@ -32,7 +32,7 @@ Khi bật **Tự động**, CommentKit quét inbox 30 giây một lần. Với m
 
 **Tự sáng tác:** chọn chủ đề (để ngẫu nhiên, hoặc gõ chủ đề riêng) rồi bấm **Sáng tác**. Tool cũng có thể tự sáng tác khi inbox trống, có giới hạn số video mỗi ngày. Các ý đã làm được ghi nhớ để không lặp lại.
 
-Mỗi video nằm trong một thư mục riêng trong `output/`: `video.mp4`, ảnh thumbnail, `script.json` và `metadata.json`. Trên app, nút **Chép tiêu đề** và **Chép mô tả** chép sẵn chữ để đăng YouTube.
+Mỗi video nằm trong một thư mục riêng trong `output/`: `video.mp4`, ảnh thumbnail, `script.json` và `metadata.json`. Trên app, nút **Chép tiêu đề** và **Chép mô tả** chép sẵn chữ để đăng YouTube. Nút **Xoá** chuyển cả thư mục của video vào Thùng rác.
 
 Đóng cửa sổ là CommentKit thoát. Nếu đang làm dở một video, tool làm xong rồi mới thoát. Chế độ tự động chỉ chạy khi cửa sổ đang mở.
 

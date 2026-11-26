@@ -69,3 +69,26 @@ def test_taskbar_identity_is_our_own():
     for other in ("hiennv0298.PlaylistKit", "hiennv0298.ClipKit", "4F7A2C19-8D3E-4B6A-A1F5-2E9C7B0D6A43",
                   "8C1E5B52-4E0B-4E52-9A43-6E3B7C2F9D11"):
         assert other not in iss
+
+
+def test_delete_video_moves_its_folder_away(client, monkeypatch):
+    out = Path(P.load_settings()["output_dir"])
+    d = out / "2026-01-01_000000_thu"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "video.mp4").write_bytes(b"x")
+    (d / "script.json").write_text("{}", encoding="utf-8")
+    (out / "dang-lam").mkdir(exist_ok=True)   # video đang dựng dở (chưa có video.mp4): không được xoá
+    assert client.post("/api/output/delete", json={"name": "dang-lam"}).status_code == 404
+    assert client.post("/api/output/delete", json={"name": ".."}).status_code == 404
+    trashed = []
+    monkeypatch.setattr(P, "move_to_trash", lambda p: trashed.append(p))
+    assert client.post("/api/output/delete", json={"name": "../" + d.name}).get_json()["ok"]   # chỉ lấy tên thư mục
+    assert trashed == [str(out / d.name)]
+
+
+def test_move_to_trash_removes_the_folder(tmp_path):
+    d = tmp_path / "video-xoa"
+    d.mkdir()
+    (d / "video.mp4").write_bytes(b"x")
+    P.move_to_trash(str(d))
+    assert not d.exists()
