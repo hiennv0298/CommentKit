@@ -6,7 +6,7 @@ Tool làm YouTube Shorts "bình luận hài" trên Windows. Mỗi video đi từ
 
 1. Tải **`CommentKit-Setup-<phiên bản>.exe`** ở mục [Releases](https://github.com/hiennv0298/CommentKit/releases/latest) rồi chạy. Bộ cài chỉ cài cho người dùng hiện tại, không cần quyền admin, vào `%LOCALAPPDATA%\Programs\CommentKit`. Có cả bản **portable zip**: giải nén rồi chạy `CommentKitApp.exe`.
 2. Mở **CommentKit** ở Start menu hoặc Desktop.
-3. Bấm **Cài giọng đọc** trên thanh màu vàng. CommentKit tải một Python riêng và VieNeu-TTS kèm model, khoảng 1 GB, vào thư mục dữ liệu. Việc này chỉ làm một lần, mất vài phút.
+3. Nếu máy đã có VieNeu-TTS (ví dụ cài cho tool khác), CommentKit tự tìm thấy và dùng luôn. Nếu chưa có, bấm **Cài giọng đọc** trên thanh màu vàng. CommentKit tải một Python riêng và VieNeu-TTS kèm model, khoảng 1 GB, vào thư mục dữ liệu. Việc này chỉ làm một lần, mất vài phút.
 4. Mở **Cài đặt**, chọn AI và nhập key:
    - **Gemini**: có gói miễn phí. Lấy key ở [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
    - **ChatGPT**: key OpenAI API còn credit.

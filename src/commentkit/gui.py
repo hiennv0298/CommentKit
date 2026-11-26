@@ -6,6 +6,7 @@
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -29,6 +30,10 @@ from .write_script import check_llm
 WEBUI = PKG / "webui"
 PREFERRED_PORT = 8765   # cố định để cửa sổ giữ địa chỉ giữa các lần mở; bận thì lấy cổng ngẫu nhiên
 SERVER_FILE = "server.json"
+# Cửa sổ mở ở http://commentkit.localhost:<cổng>/ (trình duyệt tự trỏ *.localhost về máy này). Edge đặt ID taskbar
+# của cửa sổ chế độ app theo tên máy trong địa chỉ, không tính cổng: dùng 127.0.0.1 thì CommentKit bị gộp chung
+# nút taskbar với PlaylistKit/ClipKit (cùng "MSEdge.127.0.0.1_/").
+APP_HOST = "commentkit.localhost"
 RELAUNCH_FILE = "relaunch.json"   # cổng của bản cũ, để bản mới mở lại đúng cửa sổ sau khi cập nhật
 IDLE_EXIT = 150         # cửa sổ thu nhỏ lâu chỉ gọi /api/state 1 lần/phút: chờ quá 2 lần như vậy
 app = Flask(__name__, static_folder=None)
@@ -59,8 +64,28 @@ class Worker(threading.Thread):
         return bool(self.current or self.compose_req or self.voice_req or self.voice_job == "running"
                     or updates.PROGRESS["phase"] in ("downloading", "verifying"))
 
+    def find_voice(self, quiet=False):
+        """Chưa có giọng đọc dùng được thì tìm VieNeu đã cài sẵn trên máy và dùng luôn."""
+        cfg = P.load_cfg()
+        if voice.check_python(cfg["tts"]["python"])["ok"]:
+            return True
+        found = voice.detect()
+        if not found:
+            if not quiet:
+                self.log("Không tìm thấy VieNeu nào đã cài trên máy: bấm Cài giọng đọc.")
+            return False
+        P.save_local_cfg({"tts": {"python": found["python"].replace("\\", "/"),
+                                  "hf_home": (found["hf_home"] or "").replace("\\", "/")}})
+        _voice_cache.clear()
+        self.log("Đã tìm thấy giọng đọc VieNeu có sẵn:", found["python"])
+        return True
+
     def run(self):
         self.log(f"CommentKit {__version__} sẵn sàng. Inbox:", self.settings["inbox_dir"])
+        try:
+            self.find_voice(quiet=True)
+        except Exception as e:  # noqa: BLE001
+            self.log("! không dò được giọng đọc:", e)
         while True:
             if self.voice_req:
                 self.voice_req = False
@@ -140,9 +165,9 @@ def _rel(path, root):
 
 @app.before_request
 def _local_only():
-    # chặn DNS rebinding: chỉ nhận request gửi tới chính 127.0.0.1/localhost
+    # chặn DNS rebinding: chỉ nhận request gửi tới chính máy này
     host = (request.host or "").rsplit(":", 1)[0].strip("[]").lower()
-    if host not in ("127.0.0.1", "localhost", "::1"):
+    if host not in ("127.0.0.1", "localhost", "::1", APP_HOST):
         abort(403)
 
 
@@ -323,6 +348,12 @@ def open_link():
     return jsonify(ok=True)
 
 
+@app.post("/api/voice/detect")
+def voice_detect():
+    ok = W.find_voice()
+    return jsonify(ok=ok, voice=voice_status(P.load_cfg()))
+
+
 @app.post("/api/voice/install")
 def voice_install():
     if W.voice_job != "running":
@@ -461,6 +492,22 @@ def _open_window_unless_reloaded(url, wait=15):
     open_window(url)
 
 
+def _port_free(port):
+    """Cổng còn trống thật không. Server web đặt SO_REUSEADDR, mà trên Windows cờ đó cho phép tiến trình thứ hai
+    bind chồng lên cổng đang dùng (hai app cùng nghe một cổng, request rơi ngẫu nhiên vào một trong hai).
+    Nên thử bind độc quyền trước."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        s.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
 def _browser():
     for env in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"):
         base = os.environ.get(env)
@@ -493,7 +540,7 @@ def _running_instance():
         port = int(json.loads(_server_file().read_text(encoding="utf-8"))["port"])
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/ping", timeout=1.5) as r:
             if json.loads(r.read()).get("app") == "commentkit":
-                return f"http://127.0.0.1:{port}/"
+                return f"http://{APP_HOST}:{port}/"
     except (OSError, ValueError, KeyError, TypeError):
         pass
     return None
@@ -534,11 +581,13 @@ def main(open_ui=True):
     relaunch = _take_relaunch()
     port = int(os.environ.get("COMMENTKIT_PORT") or relaunch or PREFERRED_PORT)
     try:
+        if not _port_free(port):
+            raise OSError(f"cổng {port} đang bận")
         server = make_server("127.0.0.1", port, app, threaded=True)
     except OSError:   # cổng đang bận: chạy bình thường, mở cửa sổ mới
         server, relaunch = make_server("127.0.0.1", 0, app, threaded=True), None
     SERVER = server
-    url = f"http://127.0.0.1:{server.server_port}/"
+    url = f"http://{APP_HOST}:{server.server_port}/"
     try:
         _server_file().parent.mkdir(parents=True, exist_ok=True)
         _server_file().write_text(json.dumps({"port": server.server_port, "pid": os.getpid()}), encoding="utf-8")

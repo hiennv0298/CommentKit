@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "commentkit"
-version = "0.1.3"
+version = "0.1.4"
 description = "Make Vietnamese 'funny comments' YouTube Shorts from Threads screenshots or AI-written stories, voiced with VieNeu-TTS."
 readme = "README.md"
 requires-python = ">=3.10"

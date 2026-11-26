@@ -187,3 +187,15 @@ def test_comment_gets_its_picture(tmp_path):
     assert os.path.exists(script["post"]["image"]) and os.path.exists(script["comments"][1]["image"])
     assert "image" not in script["comments"][0] and "image" not in script["comments"][2]   # chỉ số sai: bỏ qua
     assert Image.open(script["comments"][1]["image"]).getpixel((10, 10))[0] > 150
+
+
+def test_finds_an_existing_vieneu_venv_and_its_model(tmp_path):
+    venv = tmp_path / "ZAPP" / "Studio" / ".venv"
+    (venv / "Lib" / "site-packages" / "vieneu").mkdir(parents=True)
+    (venv / "Scripts").mkdir()
+    (venv / "Scripts" / "python.exe").write_bytes(b"")
+    (tmp_path / "ZAPP" / "Studio" / ".cache" / "hf" / "hub" / voice.MODEL_DIR).mkdir(parents=True)
+    (tmp_path / "Windows" / "a" / ".venv" / "Lib" / "site-packages" / "vieneu").mkdir(parents=True)   # bị bỏ qua
+    dirs = set(voice._walk_dirs(tmp_path, 3))
+    assert venv in dirs and not any("Windows" in str(d) for d in dirs)
+    assert voice._model_cache_near(venv / "Scripts" / "python.exe") == tmp_path / "ZAPP" / "Studio" / ".cache" / "hf"

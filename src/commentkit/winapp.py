@@ -112,21 +112,48 @@ def relaunch_target() -> tuple[str, str]:
     return f'"{pyw if pyw.is_file() else sys.executable}" -m commentkit', str(ico)
 
 
-def tag_window_later(timeout: float = 20.0) -> None:
-    """Chờ cửa sổ app hiện ra rồi gán cho nó danh tính taskbar riêng của CommentKit."""
-    if os.name != "nt":
+def get_window_app_id(hwnd: int) -> str | None:
+    """AppUserModelID đang gán cho cửa sổ (None nếu chưa có)."""
+    ctypes.windll.ole32.CoInitialize(None)
+    store = c_void_p()
+    if ctypes.windll.shell32.SHGetPropertyStoreForWindow(wintypes.HWND(hwnd), byref(IID_IPropertyStore), byref(store)) != 0:
+        return None
+    vtbl = ctypes.cast(ctypes.cast(store, POINTER(c_void_p))[0], POINTER(c_void_p))
+    get_value = WINFUNCTYPE(ctypes.HRESULT, c_void_p, POINTER(PROPERTYKEY), POINTER(PROPVARIANT))(vtbl[5])
+    release = WINFUNCTYPE(c_ulong, c_void_p)(vtbl[2])
+    try:
+        pv = PROPVARIANT()
+        if get_value(store, byref(PKEY_APP_ID), byref(pv)) != 0 or pv.vt != VT_LPWSTR:
+            return None
+        return ctypes.cast(pv.p, c_wchar_p).value
+    except OSError:
+        return None
+    finally:
+        release(store)
+
+
+_watching = threading.Event()
+
+
+def tag_window_later(interval: float = 2.0) -> None:
+    """Gán danh tính taskbar riêng của CommentKit cho cửa sổ app, và giữ nó suốt lúc app chạy.
+
+    Edge tự đặt lại ID của cửa sổ chế độ app theo địa chỉ trang (vd "MSEdge.127.0.0.1_/", không tính cổng),
+    nên chỉ gán một lần lúc mở là không đủ: Edge ghi đè, rồi Windows gộp CommentKit chung nút với app khác cùng
+    chạy trên 127.0.0.1 (PlaylistKit, ClipKit). Luồng này kiểm tra vài giây một lần và gán lại khi bị đổi."""
+    if os.name != "nt" or _watching.is_set():
         return
+    _watching.set()
 
     def work() -> None:
-        start = time.time()
-        done: set[int] = set()
         cmd, icon = relaunch_target()
-        while time.time() - start < timeout:
-            for hwnd in _find_windows(TITLE, start):
-                if hwnd not in done and set_window_app_id(hwnd, APP_ID, cmd, icon, TITLE):
-                    done.add(hwnd)
-            if done:
-                return
-            time.sleep(0.4)
+        while True:
+            try:
+                for hwnd in _find_windows(TITLE, 0):
+                    if get_window_app_id(hwnd) != APP_ID:
+                        set_window_app_id(hwnd, APP_ID, cmd, icon, TITLE)
+            except OSError:
+                pass
+            time.sleep(interval)
 
     threading.Thread(target=work, daemon=True).start()

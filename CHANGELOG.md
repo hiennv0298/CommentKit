@@ -3,6 +3,13 @@
 Mục của mỗi phiên bản là ghi chú phát hành trên trang GitHub Releases.
 Thêm mục `## <phiên bản>` ở đây trước khi đẩy tag `v<phiên bản>`.
 
+## 0.1.4
+
+- **Tự tìm giọng đọc đã cài.** Khi chưa có giọng đọc dùng được, app tự tìm VieNeu có sẵn trên máy (bản CommentKit đã cài, Python trên máy, các venv như `F:\ZAPP\F_VideoStudio\.venv`) cùng thư mục model đã tải, rồi dùng luôn, không bắt cài lại. Thanh báo có thêm nút **Tìm bản đã cài**.
+- **Sửa lỗi CommentKit nằm chung nút taskbar với PlaylistKit.** Edge tự đặt ID taskbar cho cửa sổ chế độ app theo tên máy trong địa chỉ (không tính cổng), nên mọi app chạy trên `127.0.0.1` bị gộp chung một nút, và ID riêng của CommentKit bị Edge ghi đè. Giờ cửa sổ mở ở `http://commentkit.localhost:<cổng>/`, và app gán lại ID riêng `hiennv0298.CommentKit` mỗi khi Edge đổi nó.
+- Sửa lỗi hai bản CommentKit cùng nghe một cổng: trên Windows, tiến trình thứ hai bind chồng lên cổng đang dùng mà không báo lỗi. Giờ app kiểm tra cổng trước, cổng bận thì dùng cổng khác.
+- Từ bản này trở đi, cập nhật xong cửa sổ cũ (địa chỉ 127.0.0.1) vẫn tự tải lại được; mở lại CommentKit thì cửa sổ mới dùng địa chỉ mới.
+
 ## 0.1.3
 
 - **Ảnh chụp thả vào cùng lúc là một bài.** Chép hoặc kéo nhiều ảnh vào thư mục inbox một lượt (cách nhau dưới 20 giây) thì tool gộp thành một video, xếp theo tên (Screenshot_1, Screenshot_2, Screenshot_10...). Trước đây mỗi ảnh lẻ thành một video riêng.

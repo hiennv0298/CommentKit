@@ -93,3 +93,26 @@ def test_move_to_trash_removes_the_folder(tmp_path):
     (d / "video.mp4").write_bytes(b"x")
     P.move_to_trash(str(d))
     assert not d.exists()
+
+
+def test_window_host_is_our_own(client):
+    from commentkit import gui
+
+    # Edge lấy ID taskbar theo tên máy trong địa chỉ: không được là 127.0.0.1 (trùng PlaylistKit/ClipKit)
+    assert gui.APP_HOST == "commentkit.localhost"
+    assert client.get("/api/ping", headers={"Host": "commentkit.localhost:8765"}).status_code == 200
+
+
+def test_busy_port_is_detected_even_with_reuseaddr():
+    import socket
+
+    from commentkit import gui
+
+    s = socket.socket()
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)   # như server web của app đang chạy
+    s.bind(("127.0.0.1", 0))
+    s.listen()
+    try:
+        assert gui._port_free(s.getsockname()[1]) is False
+    finally:
+        s.close()

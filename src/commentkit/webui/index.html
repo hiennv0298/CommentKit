@@ -106,7 +106,7 @@ button.danger:hover{filter:brightness(1.08)}
   <button class="sm" id="updLater">Để sau</button>
 </div>
 <div class="banner" id="banner"></div>
-<div class="banner info" id="voiceBanner"><span id="voiceMsg"></span> <button class="pri sm" id="voiceInstall">Cài giọng đọc</button></div>
+<div class="banner info" id="voiceBanner"><span id="voiceMsg"></span> <button class="sm" id="voiceFind">Tìm bản đã cài</button> <button class="pri sm" id="voiceInstall">Cài giọng đọc</button></div>
 
 <main>
   <section>
@@ -257,7 +257,7 @@ async function refresh(){
   if (!UPD) $("#ver").textContent = "v" + s.version;
   const v = s.voice, vb = $("#voiceBanner"), running = v.job === "running";
   vb.style.display = v.ok && !running ? "none" : "block";
-  $("#voiceInstall").style.display = running ? "none" : "";
+  $("#voiceInstall").style.display = running ? "none" : ""; $("#voiceFind").style.display = running ? "none" : "";
   $("#voiceMsg").textContent = running ? "Đang cài giọng đọc VieNeu… mất vài phút (khoảng 1 GB). Tiến độ xem ở Nhật ký."
     : (v.job && v.job.startsWith("error") ? "Cài giọng đọc lỗi: " + v.job.slice(7) + " " : "")
       + (v.managed ? "Chưa cài giọng đọc VieNeu. CommentKit cần nó để đọc video (khoảng 1 GB cả model)."
@@ -382,6 +382,11 @@ document.body.addEventListener("click", async e => {
 });
 $("#lightbox").onclick = () => $("#lightbox").style.display = "none";
 
+$("#voiceFind").onclick = async () => {
+  toast("Đang tìm VieNeu trên máy…");
+  const r = await post("/api/voice/detect");
+  toast(r.ok ? "Đã tìm thấy và dùng giọng đọc có sẵn" : "Không tìm thấy, bấm Cài giọng đọc"); refresh();
+};
 $("#voiceInstall").onclick = () => post("/api/voice/install").then(() => { toast("Đang cài giọng đọc…"); refresh(); });
 // báo app khi đóng cửa sổ để app tự thoát (đợi xong video đang làm)
 addEventListener("pagehide", () => navigator.sendBeacon("/api/bye"));

@@ -52,6 +52,77 @@ def check_python(py) -> dict:
     return {"ok": False, "error": (r.stderr or r.stdout).strip()[-200:]}
 
 
+MODEL_DIR = "models--pnnbao-ump--VieNeu-TTS-v3-Turbo"   # thư mục model trong cache HuggingFace
+
+
+def _candidates():
+    """Những python.exe có thể đã có vieneu: bản CommentKit tự cài (cả của bản cài lẫn bản mã nguồn), Python trên
+    PATH / py launcher, và các venv nằm gần gốc ổ đĩa hoặc trong thư mục người dùng (vd F:\\ZAPP\\F_VideoStudio\\.venv)."""
+    seen, out = set(), []
+
+    def add(p):
+        try:
+            p = Path(p)
+            key = str(p.resolve()).lower()
+        except OSError:
+            return
+        if key not in seen and "windowsapps" not in key and p.is_file():
+            seen.add(key)
+            out.append(p)
+
+    add(managed_python())
+    local = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    add(local / "CommentKit" / "tts" / "venv" / "Scripts" / "python.exe")
+    add(PKG.parent.parent / ".venv-tts" / "Scripts" / "python.exe")
+    for name in ("python", "python3"):
+        add(shutil.which(name) or "")
+    roots = [Path.home()] + [Path(f"{d}:\\") for d in "CDEFGHIJ" if Path(f"{d}:\\").is_dir()]
+    for root in roots:   # venv có gói vieneu, nằm sâu tối đa 3 cấp thư mục
+        for venv in _walk_dirs(root, 3):
+            if (venv / "Lib" / "site-packages" / "vieneu").is_dir():
+                add(venv / "Scripts" / "python.exe")
+    return out
+
+
+_SKIP = {"windows", "program files", "program files (x86)", "programdata", "$recycle.bin", "system volume information",
+         "appdata", "node_modules", ".git", "recovery", "perflogs", "msocache", "onedrive"}
+
+
+def _walk_dirs(root: Path, depth: int):
+    """Các thư mục con tới độ sâu depth, bỏ thư mục hệ thống và thư mục quá lớn không chứa venv."""
+    level = [root]
+    for _ in range(depth):
+        nxt = []
+        for d in level:
+            try:
+                for e in os.scandir(d):
+                    if e.is_dir(follow_symlinks=False) and e.name.lower() not in _SKIP and not e.name.startswith("$"):
+                        nxt.append(Path(e.path))
+            except OSError:
+                continue
+        yield from nxt
+        level = nxt
+
+
+def _model_cache_near(py: Path):
+    """Thư mục cache HuggingFace đã có model VieNeu, ưu tiên cái nằm cạnh venv đó."""
+    venv = py.parent.parent
+    for hf in (venv.parent / "hf", venv.parent / ".cache" / "hf", venv / ".cache" / "hf", default_hf_home(),
+               Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface")):
+        if (hf / "hub" / MODEL_DIR).is_dir():
+            return hf
+    return None
+
+
+def detect():
+    """Tìm VieNeu đã cài sẵn trên máy: {"python": ..., "hf_home": ... hoặc None} hoặc None."""
+    for py in _candidates():
+        if check_python(py)["ok"]:
+            hf = _model_cache_near(py)
+            return {"python": str(py), "hf_home": str(hf) if hf else None}
+    return None
+
+
 def status(cfg) -> dict:
     py = cfg["tts"]["python"]
     return {**check_python(py), "python": py, "managed": Path(py) == managed_python(),
