@@ -1,0 +1,30 @@
+{
+ "pick_id": "demo001",
+ "hook": "Sếp nhắn lúc 11 giờ đêm",
+ "post": {"handle": "t***ng.92", "time": "3 giờ", "likes": "18,2K", "replies": "1,4K",
+  "text": "11 giờ đêm sếp nhắn: \"Em ngủ chưa?\". Tôi run cầm cập, soạn sẵn đơn xin lỗi. Hoá ra sếp chỉ hỏi mật khẩu wifi công ty.",
+  "tts": "Mười một giờ đêm sếp nhắn: em ngủ chưa? Tôi run cầm cập, soạn sẵn cả đơn xin lỗi. Hoá ra sếp chỉ hỏi mật khẩu wifi công ty."},
+ "comments": [
+  {"who": "ba_thim", "handle": "h***_bmt", "likes": "5,1K",
+   "text": "Mười một giờ đêm còn ở công ty dò wifi, nhà sếp chắc cũng cắt mạng rồi con ơi.",
+   "tts": "Mười một giờ đêm còn ở công ty dò wifi, nhà sếp chắc cũng bị cắt mạng rồi con ơi."},
+  {"who": "genz", "handle": "l***.ly", "likes": "3,8K",
+   "text": "Tưởng tin nhắn tình cảm, ai ngờ tin nhắn tài sản.",
+   "tts": "Tưởng tin nhắn tình cảm, ai ngờ tin nhắn tài sản."},
+  {"who": "ong_chu", "handle": "c***_hn", "likes": "1,2K",
+   "text": "Thời chú đi làm, sếp nhắn đêm chỉ có một nội dung: mai không cần đến nữa.",
+   "tts": "Thời chú đi làm, sếp nhắn đêm chỉ có một nội dung thôi: mai không cần đến nữa."},
+  {"who": "thanh_bua", "handle": "q***.tt", "likes": "2,6K",
+   "text": "Đưa pass là deadlinehomnaykhonglammaicunglam viết liền không dấu, cho sếp gõ tới sáng.",
+   "tts": "Đưa mật khẩu là đét lai hôm nay không làm mai cũng làm, viết liền không dấu, cho sếp gõ tới sáng."},
+  {"who": "phat_thanh", "handle": "m***_news", "likes": "980",
+   "text": "Theo ghi nhận, đây là lần đầu tiên một nhân viên được sếp quan tâm bằng câu hỏi về hạ tầng mạng.",
+   "tts": "Theo ghi nhận, đây là lần đầu tiên một nhân viên được sếp quan tâm bằng câu hỏi về hạ tầng mạng."},
+  {"who": "anh_mien_tay", "handle": "t***_ct", "likes": "4,4K",
+   "text": "Thôi em ơi, sếp hỏi wifi là còn thương. Hôm nào sếp hỏi em có mang laptop về không, lúc đó mới lo.",
+   "tts": "Thôi em ơi, sếp hỏi wifi là còn thương. Hôm nào sếp hỏi em có mang laptop về nhà không, lúc đó mới lo."}
+ ],
+ "yt": {"title": "Sếp nhắn 11 giờ đêm: Em ngủ chưa? #shorts #haihuoc",
+  "description": "Một tin nhắn lúc nửa đêm làm cả cõi mạng tranh luận. Nội dung dựng lại từ một bài viết trên mạng xã hội, tên người dùng đã ẩn, giọng đọc AI.",
+  "tags": ["hài hước", "đi làm", "sếp", "threads", "bình luận hài"]}
+}

@@ -1,0 +1,18 @@
+# bí mật và cấu hình riêng từng máy
+.env
+config.local.json
+# môi trường, cache model
+.venv/
+.venv-tts/
+.cache/
+__pycache__/
+# dữ liệu người dùng: ảnh chụp, video nền, video ra
+inbox/*
+!inbox/.gitkeep
+backgrounds/*
+!backgrounds/.gitkeep
+output/
+state/
+*.log
+# kịch bản làm từ ảnh chụp thật, không đưa lên git
+samples/joke-*.json

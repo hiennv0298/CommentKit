@@ -1,0 +1,134 @@
+{
+  "channel_name": "Cmt Hài Mỗi Ngày",
+  "threads": {
+    "api_base": "https://graph.threads.net/v1.0",
+    "keywords": [
+      "hài",
+      "cười xỉu",
+      "drama",
+      "người yêu cũ",
+      "đi làm",
+      "sếp",
+      "mẹ tôi",
+      "tán gái",
+      "crush",
+      "kỳ cục"
+    ],
+    "search_type": "TOP",
+    "days_back": 7,
+    "per_keyword": 25,
+    "keywords_per_run": 3,
+    "candidates_to_claude": 12,
+    "replies_for_top": 5,
+    "min_len": 25,
+    "max_len": 450
+  },
+  "claude": {
+    "cmd": "claude",
+    "model": "",
+    "timeout_sec": 240
+  },
+  "tts": {
+    "python": ".venv-tts/Scripts/python.exe",
+    "hf_home": ".cache/hf",
+    "narrator": "Hải Đăng",
+    "gap_sec": 0.3,
+    "speed": 1.2
+  },
+  "characters": {
+    "nguoi_dang": {
+      "voice": "Hải Đăng",
+      "label": "người đăng bài"
+    },
+    "ba_thim": {
+      "voice": "Thục Đoan",
+      "label": "bà thím hàng xóm, chua ngoa, miền Nam"
+    },
+    "ong_chu": {
+      "voice": "Thiền Tâm Đức",
+      "label": "ông chú U60 hay dạy đời, miền Bắc",
+      "fx": "rubberband=pitch=0.93:tempo=0.95"
+    },
+    "genz": {
+      "voice": "Trúc Ly",
+      "label": "cô gái Gen Z nói teencode, hay cà khịa"
+    },
+    "thanh_bua": {
+      "voice": "Adam bựa",
+      "label": "thanh niên bựa, nói nhảm nhưng trúng"
+    },
+    "anh_mien_tay": {
+      "voice": "Thái Sơn",
+      "label": "anh miền Tây hiền lành, chậm rãi"
+    },
+    "co_mien_trung": {
+      "voice": "Ngọc Trân",
+      "label": "cô gái miền Trung thẳng tính"
+    },
+    "phat_thanh": {
+      "voice": "Mai Anh",
+      "label": "chị phát thanh viên nghiêm túc quá mức cần thiết"
+    },
+    "anh_trung": {
+      "voice": "Quang Sơn",
+      "label": "anh miền Trung kể khổ"
+    }
+  },
+  "video": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "max_comments": 7,
+    "target_sec": [
+      30,
+      58
+    ],
+    "bgm": "",
+    "bgm_volume": 0.08
+  },
+  "channel_handle": "cmthaimoingay",
+  "openai": {
+    "model": "gpt-4o",
+    "temperature": 0.9,
+    "timeout_sec": 180,
+    "base_url": "https://api.openai.com/v1"
+  },
+  "compose": {
+    "topics": [
+      "đi làm văn phòng",
+      "sếp và deadline",
+      "crush",
+      "người yêu cũ",
+      "mẹ Việt Nam",
+      "bố Việt Nam",
+      "ở trọ",
+      "đi học, thầy cô",
+      "thi cử",
+      "Tết và họ hàng",
+      "đám cưới, đi ăn cỗ",
+      "shipper và mua hàng online",
+      "đi chợ, mặc cả",
+      "tập gym",
+      "ăn kiêng",
+      "nuôi chó mèo",
+      "bạn thân",
+      "hàng xóm",
+      "xe máy, kẹt xe",
+      "điện thoại, mạng xã hội",
+      "tiền lương cuối tháng",
+      "đi phỏng vấn xin việc",
+      "đi du lịch",
+      "nhà hàng, quán ăn",
+      "con nít, em út trong nhà"
+    ]
+  },
+  "gemini": {
+    "model": "gemini-flash-latest",
+    "fallback_models": [
+      "gemini-3.5-flash",
+      "gemini-flash-lite-latest"
+    ],
+    "temperature": 0.9,
+    "timeout_sec": 120
+  }
+}

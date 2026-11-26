@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CommentKit</title>
+<style>
+:root{--bg:#0e0f12;--card:#17181d;--card2:#1f2027;--line:#2a2c35;--text:#eef0f4;--mut:#8b8f9c;--acc:#ffd60a;--ok:#4ade80;--err:#f87171;--blue:#60a5fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 20px;background:#0e0f12ee;border-bottom:1px solid var(--line);backdrop-filter:blur(6px)}
+h1{font-size:18px;margin:0 12px 0 0}
+h1 b{color:var(--acc)}
+.pill{padding:4px 10px;border-radius:999px;background:var(--card2);color:var(--mut);font-size:13px;white-space:nowrap}
+.pill.run{background:#3b2f00;color:var(--acc)}
+.pill.ok{background:#0f2e1b;color:var(--ok)}
+.pill.bad{background:#3a1414;color:var(--err)}
+button{font:inherit;border:1px solid var(--line);background:var(--card2);color:var(--text);padding:7px 12px;border-radius:9px;cursor:pointer}
+button:hover{border-color:#444857}
+button.pri{background:var(--acc);color:#111;border-color:var(--acc);font-weight:600}
+button.sm{padding:4px 9px;font-size:12px}
+.sw{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.sw input{display:none}
+.sw i{width:38px;height:22px;border-radius:99px;background:#3a3d48;position:relative;transition:.2s}
+.sw i:after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.sw input:checked+i{background:var(--ok)}
+.sw input:checked+i:after{left:19px}
+.spacer{flex:1}
+.banner{margin:12px 20px 0;padding:10px 14px;border-radius:10px;background:#3a1414;color:#fecaca;display:none}
+main{display:grid;grid-template-columns:380px 1fr;gap:18px;padding:18px 20px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px}
+.box h2{font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.box h2 .n{color:var(--mut);font-weight:400}
+.drop{border:2px dashed #3a3d48;border-radius:12px;padding:22px 12px;text-align:center;color:var(--mut);cursor:pointer;transition:.15s}
+.drop.over{border-color:var(--acc);color:var(--text);background:#1c1a0f}
+.drop b{color:var(--text)}
+.opts{display:flex;gap:14px;margin-top:10px;color:var(--mut);font-size:13px;flex-wrap:wrap}
+.job{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:var(--card2);margin-top:8px}
+.thumbs{display:flex;gap:4px;flex-shrink:0}
+.thumbs img{width:44px;height:58px;object-fit:cover;object-position:top;border-radius:6px;border:1px solid var(--line);cursor:zoom-in}
+.job .meta{flex:1;min-width:0}
+.job .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:13px}
+.job .sub{color:var(--mut);font-size:12px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.job .sub.err{color:var(--err)}
+.empty{color:var(--mut);font-size:13px;padding:6px 2px}
+.bg{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--card2);margin-top:6px;font-size:13px}
+.bg span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+label.f{display:block;color:var(--mut);font-size:12px;margin:8px 0 4px}
+select.t,input.t{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 9px;font:inherit}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.vid{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.vid video{width:100%;aspect-ratio:9/16;background:#000;display:block}
+.vid .in{padding:10px;display:flex;flex-direction:column;gap:6px;flex:1}
+.vid .tt{font-weight:600;font-size:13px}
+.vid .ds{color:var(--mut);font-size:12px}
+.vid .act{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+pre.log{margin:0;max-height:260px;overflow:auto;background:#0a0b0d;border-radius:10px;padding:10px;font:12px/1.5 Consolas,monospace;color:#c9cdd6;white-space:pre-wrap}
+details summary{cursor:pointer;color:var(--mut);font-size:13px}
+#lightbox{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center;z-index:20;cursor:zoom-out}
+#lightbox img{max-width:92vw;max-height:92vh;border-radius:8px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#222;border:1px solid var(--line);padding:9px 16px;border-radius:10px;opacity:0;transition:.2s;pointer-events:none}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>Comment<b>Kit</b></h1>
+  <span id="status" class="pill">…</span>
+  <label class="sw" title="Tự quét thư mục inbox"><input type="checkbox" id="auto"><i></i>Tự động</label>
+  <span id="next" class="pill" style="display:none"></span>
+  <button class="pri" id="scan">Quét ngay</button>
+  <span class="spacer"></span>
+  <button id="composeTop">✎ Sáng tác 1 video</button>
+  <span id="llmRead" class="pill">Đọc ảnh: ?</span>
+  <span id="llmCompose" class="pill">Sáng tác: ?</span>
+</header>
+<div class="banner" id="banner"></div>
+
+<main>
+  <section>
+    <div class="box">
+      <h2>Thêm ảnh chụp Threads</h2>
+      <div class="drop" id="drop"><b>Kéo thả ảnh vào đây</b><br>hoặc bấm để chọn · png / jpg / webp</div>
+      <input type="file" id="file" accept="image/*" multiple hidden>
+      <div class="opts">
+        <label><input type="radio" name="mode" value="group" checked> Các ảnh cùng 1 bài → 1 video</label>
+        <label><input type="radio" name="mode" value="each"> Mỗi ảnh 1 video</label>
+      </div>
+      <p class="empty" style="margin:10px 0 0">Bạn cũng có thể chép thẳng ảnh vào thư mục inbox. Một thư mục con là một bài.</p>
+    </div>
+
+    <div class="box">
+      <h2>Tự sáng tác <span class="n" id="nComp"></span></h2>
+      <div style="display:flex;gap:8px">
+        <select class="t" id="topic" style="flex:1"></select>
+        <button class="pri" id="compose">Sáng tác</button>
+      </div>
+      <input class="t" id="topicCustom" placeholder="…hoặc gõ chủ đề riêng" style="margin-top:8px">
+      <div class="opts" style="align-items:center">
+        <label class="sw"><input type="checkbox" id="compAuto"><i></i>Tự sáng tác khi inbox trống</label>
+        <span>tối đa <input class="t" id="compPerDay" type="number" min="0" style="width:60px;display:inline-block;padding:4px 6px"> video/ngày</span>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Đang chờ <span class="n" id="nPend"></span><span class="spacer"></span><button class="sm" data-open="inbox">Mở inbox</button></h2>
+      <div id="pending"></div>
+    </div>
+
+    <div class="box" id="failBox" style="display:none">
+      <h2>Lỗi <span class="n" id="nFail"></span></h2>
+      <div id="failed"></div>
+    </div>
+
+    <div class="box">
+      <h2>Video nền <span class="n" id="nBg"></span><span class="spacer"></span><button class="sm" id="bgAdd">+ Thêm</button><button class="sm" data-open="bg">Mở</button></h2>
+      <input type="file" id="bgFile" accept="video/*" multiple hidden>
+      <div id="bgs"></div>
+      <p class="empty" style="margin:8px 0 0">Mỗi video lấy ngẫu nhiên một file, bắt đầu từ một đoạn ngẫu nhiên.</p>
+    </div>
+
+    <div class="box">
+      <details>
+        <summary>Đã đọc gần đây <span id="nDone"></span></summary>
+        <div id="done"></div>
+      </details>
+    </div>
+
+    <div class="box">
+      <details>
+        <summary>Cài đặt</summary>
+        <label class="f">Thư mục inbox (ảnh chụp)</label><input class="t" id="sInbox">
+        <label class="f">Thư mục video nền</label><input class="t" id="sBg">
+        <label class="f">Thư mục video xuất ra</label><input class="t" id="sOut">
+        <label class="f">Quét mỗi (giây)</label><input class="t" id="sInt" type="number" min="5">
+        <label class="f">Đọc ảnh chụp bằng</label>
+        <select class="t" id="pRead"><option value="claude">Claude (Claude Code CLI)</option><option value="openai">ChatGPT (OpenAI API key)</option><option value="gemini">Gemini (Google, có gói miễn phí)</option></select>
+        <label class="f">Tự sáng tác bằng</label>
+        <select class="t" id="pComp"><option value="claude">Claude (Claude Code CLI)</option><option value="openai">ChatGPT (OpenAI API key)</option><option value="gemini">Gemini (Google, có gói miễn phí)</option></select>
+        <label class="f">OpenAI API key <span id="keyState"></span></label><input class="t" id="oKey" type="password" placeholder="sk-..." autocomplete="off">
+        <label class="f">Model OpenAI</label><input class="t" id="oModel" placeholder="gpt-4o">
+        <label class="f">Gemini API key <span id="gKeyState"></span> · lấy ở aistudio.google.com</label><input class="t" id="gKey" type="password" placeholder="AIza..." autocomplete="off">
+        <label class="f">Model Gemini</label><input class="t" id="gModel" placeholder="gemini-flash-latest">
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="sm" data-chk="claude">Kiểm tra Claude</button><button class="sm" data-chk="openai">Kiểm tra OpenAI</button><button class="sm" data-chk="gemini">Kiểm tra Gemini</button></div>
+        <div style="margin-top:10px"><button class="pri" id="save">Lưu</button></div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <div class="box">
+      <h2>Video đã làm <span class="n" id="nOut"></span><span class="spacer"></span><button class="sm" data-open="output">Mở thư mục</button></h2>
+      <div class="grid" id="outputs"></div>
+    </div>
+    <div class="box">
+      <h2>Nhật ký</h2>
+      <pre class="log" id="log"></pre>
+    </div>
+  </section>
+</main>
+
+<div id="lightbox"><img alt=""></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const post = (u, b) => fetch(u, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(b||{})}).then(r => r.json());
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("on"),2200); }
+let shownOutputs = "", settingsFilled = false;
+
+function thumbs(imgs){ return `<div class="thumbs">${imgs.slice(0,3).map(u=>`<img src="${esc(u)}" loading="lazy">`).join("")}</div>`; }
+
+async function refresh(){
+  let s;
+  try { s = await fetch("/api/state").then(r => r.json()); } catch { $("#status").textContent="Mất kết nối"; $("#status").className="pill bad"; return; }
+  const st = $("#status");
+  if (s.current){ st.textContent = "Đang làm: " + s.current; st.className = "pill run"; }
+  else { st.textContent = s.settings.auto ? "Đang chờ ảnh mới" : "Tạm dừng"; st.className = "pill" + (s.settings.auto ? " ok" : ""); }
+  $("#auto").checked = s.settings.auto;
+  const nx = $("#next");
+  if (s.settings.auto && !s.current && s.next_scan != null){ nx.style.display=""; nx.textContent = "quét lại sau " + s.next_scan + "s"; } else nx.style.display="none";
+  const nm = {claude:"Claude", openai:"ChatGPT", gemini:"Gemini"};
+  for (const [id, label, prov] of [["#llmRead","Đọc ảnh",s.settings.provider_read],["#llmCompose","Sáng tác",s.settings.provider_compose]]){
+    const st2 = s.llm[prov], el = $(id);
+    el.textContent = `${label}: ${nm[prov]}` + (st2 ? (st2.ok ? " ✓" : " ✗") : "");
+    el.className = "pill" + (st2 ? (st2.ok ? " ok" : " bad") : "");
+    el.title = st2 ? st2.msg : "Bấm Kiểm tra trong Cài đặt";
+  }
+  $("#nComp").textContent = `hôm nay ${s.composed_today}/${s.settings.compose_per_day}` + (s.compose_queue ? ` · chờ ${s.compose_queue}` : "");
+  $("#compAuto").checked = !!s.settings.compose_auto;
+  if (document.activeElement !== $("#compPerDay")) $("#compPerDay").value = s.settings.compose_per_day;
+  $("#keyState").textContent = s.openai_key ? "(đã có key, nhập để thay)" : "(chưa có)";
+  $("#gKeyState").textContent = s.gemini_key ? "(đã có key, nhập để thay)" : "(chưa có)";
+  if (!$("#topic").options.length){
+    $("#topic").innerHTML = `<option value="">Chủ đề ngẫu nhiên</option>` + s.topics.map(t => `<option>${esc(t)}</option>`).join("");
+  }
+  const b = $("#banner"); b.style.display = s.error ? "block" : "none"; b.textContent = s.error || "";
+
+  $("#nPend").textContent = s.pending.length || "";
+  $("#pending").innerHTML = s.pending.length ? s.pending.map(j => `
+    <div class="job">${thumbs(j.images)}<div class="meta"><div class="nm">${esc(j.name)}</div>
+    <div class="sub">${j.images.length} ảnh · ${j.ready ? (s.current===j.name ? "đang xử lý…" : "sẵn sàng") : "đang chép…"}</div></div></div>`).join("")
+    : `<div class="empty">Không có ảnh nào đang chờ.</div>`;
+
+  $("#failBox").style.display = s.failed.length ? "" : "none";
+  $("#nFail").textContent = s.failed.length || "";
+  $("#failed").innerHTML = s.failed.map(j => `
+    <div class="job">${thumbs(j.images)}<div class="meta"><div class="nm">${esc(j.name)}</div>
+    <div class="sub err" title="${esc(j.error)}">${esc(j.error)}</div></div>
+    <button class="sm" data-retry="${esc(j.name)}">Thử lại</button></div>`).join("");
+
+  $("#nDone").textContent = s.done.length ? `(${s.done.length})` : "";
+  $("#done").innerHTML = s.done.length ? s.done.map(j => `
+    <div class="job">${thumbs(j.images)}<div class="meta"><div class="nm">${esc(j.title || j.name)}</div>
+    <div class="sub">${j.skipped ? "Bỏ qua: " + esc(j.reason) : "Đã làm video"}</div></div></div>`).join("") : `<div class="empty">Chưa có.</div>`;
+
+  $("#nBg").textContent = s.backgrounds.length || "";
+  $("#bgs").innerHTML = s.backgrounds.length ? s.backgrounds.map(n => `
+    <div class="bg"><span title="${esc(n)}">${esc(n)}</span><button class="sm" data-bgdel="${esc(n)}">Xoá</button></div>`).join("")
+    : `<div class="empty">Chưa có video nền, tool sẽ dùng nền tối.</div>`;
+
+  const key = JSON.stringify(s.outputs.map(o => o.name));
+  if (key !== shownOutputs){
+    shownOutputs = key;
+    $("#nOut").textContent = s.outputs.length || "";
+    $("#outputs").innerHTML = s.outputs.length ? s.outputs.map(o => `
+      <div class="vid"><video src="/media/out/${encodeURIComponent(o.name)}/video.mp4" poster="/media/out/${encodeURIComponent(o.name)}/video_thumb.jpg" controls preload="none"></video>
+      <div class="in"><div class="tt">${esc(o.title)}</div>
+      <div class="ds">${o.duration ? o.duration.toFixed(1)+"s" : ""}${o.background ? " · nền: "+esc(o.background) : ""}</div>
+      <div class="act">
+        <button class="sm" data-copy="${esc(o.title)}">Chép tiêu đề</button>
+        <button class="sm" data-copy="${esc((o.description||"") + "\n\n" + (o.tags||[]).map(t=>"#"+t.replace(/\s+/g,"")).join(" "))}">Chép mô tả</button>
+        <button class="sm" data-openout="${esc(o.name)}">Thư mục</button>
+      </div></div></div>`).join("") : `<div class="empty">Chưa có video nào.</div>`;
+  }
+
+  const lg = $("#log"), atBottom = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 20;
+  lg.textContent = s.logs.join("\n");
+  if (atBottom) lg.scrollTop = lg.scrollHeight;
+
+  if (!settingsFilled){
+    settingsFilled = true;
+    $("#sInbox").value = s.settings.inbox_dir; $("#sBg").value = s.settings.bg_dir;
+    $("#sOut").value = s.settings.output_dir; $("#sInt").value = s.settings.interval_sec;
+    $("#pRead").value = s.settings.provider_read; $("#pComp").value = s.settings.provider_compose; $("#oModel").value = s.openai_model || ""; $("#gModel").value = s.gemini_model || "";
+  }
+}
+
+async function upload(files){
+  const imgs = [...files].filter(f => /\.(png|jpe?g|webp)$/i.test(f.name));
+  if (!imgs.length) return toast("Không có ảnh hợp lệ");
+  const fd = new FormData();
+  imgs.forEach(f => fd.append("files", f));
+  fd.append("mode", document.querySelector("input[name=mode]:checked").value);
+  const r = await fetch("/api/upload", {method:"POST", body:fd}).then(r => r.json());
+  toast(r.ok ? `Đã thêm ${r.n} ảnh` : r.msg); refresh();
+}
+
+const drop = $("#drop");
+drop.onclick = () => $("#file").click();
+$("#file").onchange = e => { upload(e.target.files); e.target.value = ""; };
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => upload(e.dataTransfer.files));
+document.addEventListener("paste", e => { const f = [...e.clipboardData.files]; if (f.length) upload(f); });
+
+$("#auto").onchange = e => post("/api/auto", {on:e.target.checked}).then(refresh);
+$("#scan").onclick = () => post("/api/scan").then(() => { toast("Đang quét inbox…"); setTimeout(refresh, 800); });
+const doCompose = async () => {
+  const topic = $("#topicCustom").value.trim() || $("#topic").value;
+  const r = await post("/api/compose", {topic}); toast(`Đã xếp lượt sáng tác (${r.queued} đang chờ)`); $("#topicCustom").value=""; refresh();
+};
+$("#compose").onclick = doCompose; $("#composeTop").onclick = doCompose;
+$("#compAuto").onchange = e => post("/api/settings", {compose_auto:e.target.checked}).then(refresh);
+$("#compPerDay").onchange = e => post("/api/settings", {compose_per_day:+e.target.value}).then(refresh);
+$("#bgAdd").onclick = () => $("#bgFile").click();
+$("#bgFile").onchange = async e => {
+  const fd = new FormData(); [...e.target.files].forEach(f => fd.append("files", f));
+  toast("Đang tải video nền lên…");
+  const r = await fetch("/api/bg/upload", {method:"POST", body:fd}).then(r => r.json());
+  toast(r.ok ? `Đã thêm ${r.n} video nền` : "Không có video hợp lệ"); e.target.value=""; refresh();
+};
+$("#save").onclick = () => post("/api/settings", {inbox_dir:$("#sInbox").value, bg_dir:$("#sBg").value, output_dir:$("#sOut").value,
+    interval_sec:+$("#sInt").value, provider_read:$("#pRead").value, provider_compose:$("#pComp").value,
+    openai_key:$("#oKey").value.trim(), openai_model:$("#oModel").value.trim(),
+    gemini_key:$("#gKey").value.trim(), gemini_model:$("#gModel").value.trim()})
+  .then(() => { toast("Đã lưu"); $("#oKey").value=""; $("#gKey").value=""; settingsFilled=false; shownOutputs=""; refresh(); });
+
+document.body.addEventListener("click", async e => {
+  const t = e.target;
+  if (t.dataset.chk){ t.textContent = "Đang kiểm tra…"; const r = await post("/api/check-llm", {provider:t.dataset.chk}); t.textContent = "Kiểm tra " + ({openai:"OpenAI", gemini:"Gemini", claude:"Claude"})[t.dataset.chk]; toast(r.ok ? "OK" : r.msg); refresh(); }
+  else if (t.dataset.retry){ await post("/api/retry", {name:t.dataset.retry}); toast("Đưa lại vào hàng chờ"); refresh(); }
+  else if (t.dataset.bgdel){ if (confirm("Xoá video nền " + t.dataset.bgdel + "?")) { await post("/api/bg/delete", {name:t.dataset.bgdel}); refresh(); } }
+  else if (t.dataset.copy !== undefined){ await navigator.clipboard.writeText(t.dataset.copy); toast("Đã chép"); }
+  else if (t.dataset.openout){ post("/api/open", {kind:"output", name:t.dataset.openout}); }
+  else if (t.dataset.open){ post("/api/open", {kind:t.dataset.open}); }
+  else if (t.matches(".thumbs img")){ const lb=$("#lightbox"); lb.querySelector("img").src=t.src; lb.style.display="flex"; }
+});
+$("#lightbox").onclick = () => $("#lightbox").style.display = "none";
+
+refresh(); setInterval(refresh, 2000);
+</script>
+</body>
+</html>
