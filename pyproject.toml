@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "commentkit"
+version = "0.1.0"
+description = "Make Vietnamese 'funny comments' YouTube Shorts from Threads screenshots or AI-written stories, voiced with VieNeu-TTS."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "flask>=3.0",
+    "pillow>=10",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pyinstaller>=6.10", "numpy>=1.24"]
+
+[project.scripts]
+commentkit = "commentkit.cli:main"
+
+[project.gui-scripts]
+commentkit-gui = "commentkit.gui:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+commentkit = ["webui/*", "config.json", "tts_vieneu.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

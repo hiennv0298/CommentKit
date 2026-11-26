@@ -1,36 +1,29 @@
 {
   "channel_name": "Cmt Hài Mỗi Ngày",
-  "threads": {
-    "api_base": "https://graph.threads.net/v1.0",
-    "keywords": [
-      "hài",
-      "cười xỉu",
-      "drama",
-      "người yêu cũ",
-      "đi làm",
-      "sếp",
-      "mẹ tôi",
-      "tán gái",
-      "crush",
-      "kỳ cục"
-    ],
-    "search_type": "TOP",
-    "days_back": 7,
-    "per_keyword": 25,
-    "keywords_per_run": 3,
-    "candidates_to_claude": 12,
-    "replies_for_top": 5,
-    "min_len": 25,
-    "max_len": 450
-  },
+  "channel_handle": "cmthaimoingay",
   "claude": {
     "cmd": "claude",
     "model": "",
     "timeout_sec": 240
   },
+  "openai": {
+    "model": "gpt-4o",
+    "temperature": 0.9,
+    "timeout_sec": 180,
+    "base_url": "https://api.openai.com/v1"
+  },
+  "gemini": {
+    "model": "gemini-flash-latest",
+    "fallback_models": [
+      "gemini-3.5-flash",
+      "gemini-flash-lite-latest"
+    ],
+    "temperature": 0.9,
+    "timeout_sec": 120
+  },
   "tts": {
-    "python": ".venv-tts/Scripts/python.exe",
-    "hf_home": ".cache/hf",
+    "python": "",
+    "hf_home": "",
     "narrator": "Hải Đăng",
     "gap_sec": 0.3,
     "speed": 1.2
@@ -86,13 +79,6 @@
     "bgm": "",
     "bgm_volume": 0.08
   },
-  "channel_handle": "cmthaimoingay",
-  "openai": {
-    "model": "gpt-4o",
-    "temperature": 0.9,
-    "timeout_sec": 180,
-    "base_url": "https://api.openai.com/v1"
-  },
   "compose": {
     "topics": [
       "đi làm văn phòng",
@@ -121,14 +107,5 @@
       "nhà hàng, quán ăn",
       "con nít, em út trong nhà"
     ]
-  },
-  "gemini": {
-    "model": "gemini-flash-latest",
-    "fallback_models": [
-      "gemini-3.5-flash",
-      "gemini-flash-lite-latest"
-    ],
-    "temperature": 0.9,
-    "timeout_sec": 120
   }
 }

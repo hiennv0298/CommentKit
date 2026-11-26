@@ -4,12 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CommentKit</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <style>
 :root{--bg:#0e0f12;--card:#17181d;--card2:#1f2027;--line:#2a2c35;--text:#eef0f4;--mut:#8b8f9c;--acc:#ffd60a;--ok:#4ade80;--err:#f87171;--blue:#60a5fa}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
 header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 20px;background:#0e0f12ee;border-bottom:1px solid var(--line);backdrop-filter:blur(6px)}
-h1{font-size:18px;margin:0 12px 0 0}
+h1{font-size:18px;margin:0 12px 0 0;display:flex;align-items:center;gap:9px}
+h1 img{border-radius:7px}
 h1 b{color:var(--acc)}
 .pill{padding:4px 10px;border-radius:999px;background:var(--card2);color:var(--mut);font-size:13px;white-space:nowrap}
 .pill.run{background:#3b2f00;color:var(--acc)}
@@ -26,6 +31,7 @@ button.sm{padding:4px 9px;font-size:12px}
 .sw input:checked+i{background:var(--ok)}
 .sw input:checked+i:after{left:19px}
 .spacer{flex:1}
+.banner.info{background:#2e2a10;color:#fde68a}
 .banner{margin:12px 20px 0;padding:10px 14px;border-radius:10px;background:#3a1414;color:#fecaca;display:none}
 main{display:grid;grid-template-columns:380px 1fr;gap:18px;padding:18px 20px}
 @media(max-width:900px){main{grid-template-columns:1fr}}
@@ -65,7 +71,8 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
 </head>
 <body>
 <header>
-  <h1>Comment<b>Kit</b></h1>
+  <h1><img src="/icon-192.png" alt="" width="28" height="28">Comment<b>Kit</b></h1>
+  <span id="ver" class="pill" title="Phiên bản"></span>
   <span id="status" class="pill">…</span>
   <label class="sw" title="Tự quét thư mục inbox"><input type="checkbox" id="auto"><i></i>Tự động</label>
   <span id="next" class="pill" style="display:none"></span>
@@ -76,12 +83,13 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
   <span id="llmCompose" class="pill">Sáng tác: ?</span>
 </header>
 <div class="banner" id="banner"></div>
+<div class="banner info" id="voiceBanner"><span id="voiceMsg"></span> <button class="pri sm" id="voiceInstall">Cài giọng đọc</button></div>
 
 <main>
   <section>
     <div class="box">
       <h2>Thêm ảnh chụp Threads</h2>
-      <div class="drop" id="drop"><b>Kéo thả ảnh vào đây</b><br>hoặc bấm để chọn · png / jpg / webp</div>
+      <div class="drop" id="drop"><b>Kéo thả ảnh vào đây</b><br>hoặc bấm để chọn · dán bằng Ctrl+V · png / jpg / webp</div>
       <input type="file" id="file" accept="image/*" multiple hidden>
       <div class="opts">
         <label><input type="radio" name="mode" value="group" checked> Các ảnh cùng 1 bài → 1 video</label>
@@ -117,7 +125,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
       <h2>Video nền <span class="n" id="nBg"></span><span class="spacer"></span><button class="sm" id="bgAdd">+ Thêm</button><button class="sm" data-open="bg">Mở</button></h2>
       <input type="file" id="bgFile" accept="video/*" multiple hidden>
       <div id="bgs"></div>
-      <p class="empty" style="margin:8px 0 0">Mỗi video lấy ngẫu nhiên một file, bắt đầu từ một đoạn ngẫu nhiên.</p>
+      <p class="empty" style="margin:8px 0 0">Mỗi video lấy ngẫu nhiên một file, bắt đầu từ một đoạn ngẫu nhiên. Nên dùng gameplay tự quay hoặc video được dùng tự do.</p>
     </div>
 
     <div class="box">
@@ -143,6 +151,8 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
         <label class="f">Gemini API key <span id="gKeyState"></span> · lấy ở aistudio.google.com</label><input class="t" id="gKey" type="password" placeholder="AIza..." autocomplete="off">
         <label class="f">Model Gemini</label><input class="t" id="gModel" placeholder="gemini-flash-latest">
         <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="sm" data-chk="claude">Kiểm tra Claude</button><button class="sm" data-chk="openai">Kiểm tra OpenAI</button><button class="sm" data-chk="gemini">Kiểm tra Gemini</button></div>
+        <label class="f">Python của VieNeu <span id="ttsState"></span> · để trống để dùng bản CommentKit tự cài</label><input class="t" id="sTts" placeholder="C:\duong\dan\venv\Scripts\python.exe">
+        <div class="empty" id="homeInfo"></div>
         <div style="margin-top:10px"><button class="pri" id="save">Lưu</button></div>
       </details>
     </div>
@@ -166,7 +176,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const post = (u, b) => fetch(u, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(b||{})}).then(r => r.json());
+const post = (u, b) => fetch(u, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(b||{})}).then(r => r.json()).catch(() => ({ok:false, msg:"Không gửi được yêu cầu"}));
 function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("on"),2200); }
 let shownOutputs = "", settingsFilled = false;
 
@@ -197,6 +207,16 @@ async function refresh(){
     $("#topic").innerHTML = `<option value="">Chủ đề ngẫu nhiên</option>` + s.topics.map(t => `<option>${esc(t)}</option>`).join("");
   }
   const b = $("#banner"); b.style.display = s.error ? "block" : "none"; b.textContent = s.error || "";
+  $("#ver").textContent = "v" + s.version;
+  const v = s.voice, vb = $("#voiceBanner"), running = v.job === "running";
+  vb.style.display = v.ok && !running ? "none" : "block";
+  $("#voiceInstall").style.display = running ? "none" : "";
+  $("#voiceMsg").textContent = running ? "Đang cài giọng đọc VieNeu… mất vài phút (khoảng 1 GB). Tiến độ xem ở Nhật ký."
+    : (v.job && v.job.startsWith("error") ? "Cài giọng đọc lỗi: " + v.job.slice(7) + " " : "")
+      + (v.managed ? "Chưa cài giọng đọc VieNeu. CommentKit cần nó để đọc video (khoảng 1 GB cả model)."
+                   : "Python của VieNeu trong Cài đặt không chạy được (" + v.error + "). Cài bản riêng của CommentKit, hoặc sửa đường dẫn.");
+  $("#ttsState").textContent = v.ok ? "(sẵn sàng)" : "(" + (v.error || "chưa sẵn sàng") + ")";
+  $("#homeInfo").textContent = "Thư mục dữ liệu: " + s.home + (s.ffmpeg ? "" : " · không thấy ffmpeg!");
 
   $("#nPend").textContent = s.pending.length || "";
   $("#pending").innerHTML = s.pending.length ? s.pending.map(j => `
@@ -245,6 +265,7 @@ async function refresh(){
     $("#sInbox").value = s.settings.inbox_dir; $("#sBg").value = s.settings.bg_dir;
     $("#sOut").value = s.settings.output_dir; $("#sInt").value = s.settings.interval_sec;
     $("#pRead").value = s.settings.provider_read; $("#pComp").value = s.settings.provider_compose; $("#oModel").value = s.openai_model || ""; $("#gModel").value = s.gemini_model || "";
+    $("#sTts").value = s.voice.managed ? "" : s.voice.python;
   }
 }
 
@@ -285,8 +306,8 @@ $("#bgFile").onchange = async e => {
 $("#save").onclick = () => post("/api/settings", {inbox_dir:$("#sInbox").value, bg_dir:$("#sBg").value, output_dir:$("#sOut").value,
     interval_sec:+$("#sInt").value, provider_read:$("#pRead").value, provider_compose:$("#pComp").value,
     openai_key:$("#oKey").value.trim(), openai_model:$("#oModel").value.trim(),
-    gemini_key:$("#gKey").value.trim(), gemini_model:$("#gModel").value.trim()})
-  .then(() => { toast("Đã lưu"); $("#oKey").value=""; $("#gKey").value=""; settingsFilled=false; shownOutputs=""; refresh(); });
+    gemini_key:$("#gKey").value.trim(), gemini_model:$("#gModel").value.trim(), tts_python:$("#sTts").value.trim()})
+  .then(r => { if (!r.ok) return toast(r.msg || "Chưa lưu được"); toast("Đã lưu"); $("#oKey").value=""; $("#gKey").value=""; settingsFilled=false; shownOutputs=""; refresh(); });
 
 document.body.addEventListener("click", async e => {
   const t = e.target;
@@ -300,6 +321,9 @@ document.body.addEventListener("click", async e => {
 });
 $("#lightbox").onclick = () => $("#lightbox").style.display = "none";
 
+$("#voiceInstall").onclick = () => post("/api/voice/install").then(() => { toast("Đang cài giọng đọc…"); refresh(); });
+// báo app khi đóng cửa sổ để app tự thoát (đợi xong video đang làm)
+addEventListener("pagehide", () => navigator.sendBeacon("/api/bye"));
 refresh(); setInterval(refresh, 2000);
 </script>
 </body>

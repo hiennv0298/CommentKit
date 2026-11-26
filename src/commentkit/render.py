@@ -3,6 +3,8 @@ Gameplay (lấy ngẫu nhiên trong backgrounds/) phủ kín màn hình, thẻ T
 import hashlib, json, os, random, re, subprocess
 from PIL import Image, ImageDraw, ImageFont
 
+from .paths import NO_WINDOW
+
 FONT_DIR = os.environ.get("WINDIR", "C:/Windows") + "/Fonts/"
 BG, ACTIVE = (16, 16, 16), (36, 36, 36)
 WHITE, GRAY, LINE, ACCENT = (243, 245, 247), (119, 119, 119), (51, 51, 51), (255, 214, 10)
@@ -132,7 +134,7 @@ def ease(x):
 
 
 def probe_duration(path):
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", path],
+    r = subprocess.run(creationflags=NO_WINDOW, args=["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", path],
                        capture_output=True, text=True)
     try:
         return float(json.loads(r.stdout)["format"]["duration"])
@@ -247,7 +249,7 @@ def render(script, timing, wav, out_mp4, cfg, bg_dir=None):
     cmd += ["-filter_complex", ";".join(filters), "-map", "[v]", "-map", amap, "-t", f"{total:.2f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", out_mp4]
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=NO_WINDOW)
     TR, cache = 0.22, {}
     try:
         for f in range(int(total * fps)):
@@ -267,7 +269,7 @@ def render(script, timing, wav, out_mp4, cfg, bg_dir=None):
     err = proc.stderr.read().decode("utf-8", "replace")
     if proc.wait() != 0:
         raise RuntimeError("ffmpeg lỗi: " + err[-800:])
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{min(total - 0.5, starts[min(1, n - 1)] + 1):.2f}", "-i", out_mp4,
+    subprocess.run(creationflags=NO_WINDOW, args=["ffmpeg", "-v", "error", "-y", "-ss", f"{min(total - 0.5, starts[min(1, n - 1)] + 1):.2f}", "-i", out_mp4,
                     "-frames:v", "1", "-q:v", "3", os.path.splitext(out_mp4)[0] + "_thumb.jpg"])
     return dict(background=os.path.basename(bg) if bg else None)
 

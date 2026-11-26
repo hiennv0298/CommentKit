@@ -1,82 +1,86 @@
 # CommentKit
 
-Tool tự làm YouTube Shorts "bình luận hài" từ ảnh chụp bài Threads, hoặc tự sáng tác truyện mới. Chạy trên Windows 10/11.
+Tool làm YouTube Shorts "bình luận hài" trên Windows. Mỗi video đi từ ảnh chụp bài Threads, hoặc từ một truyện AI tự sáng tác. Bài đăng và bình luận hiện lần lượt từng thẻ trên nền gameplay, mỗi nhân vật có một giọng đọc AI tiếng Việt riêng.
 
 ## Cài đặt
-**Cách 1, một lệnh:** mở PowerShell, dán lệnh sau rồi Enter. Tool được cài vào `%USERPROFILE%\CommentKit`.
-```powershell
-irm https://raw.githubusercontent.com/hiennv0298/CommentKit/main/get.ps1 | iex
+
+1. Tải **`CommentKit-Setup-<phiên bản>.exe`** ở mục [Releases](https://github.com/hiennv0298/CommentKit/releases/latest) rồi chạy. Bộ cài chỉ cài cho người dùng hiện tại, không cần quyền admin, vào `%LOCALAPPDATA%\Programs\CommentKit`. Có cả bản **portable zip**: giải nén rồi chạy `CommentKitApp.exe`.
+2. Mở **CommentKit** ở Start menu hoặc Desktop.
+3. Bấm **Cài giọng đọc** trên thanh màu vàng. CommentKit tải một Python riêng và VieNeu-TTS kèm model, khoảng 1 GB, vào thư mục dữ liệu. Việc này chỉ làm một lần, mất vài phút.
+4. Mở **Cài đặt**, chọn AI và nhập key:
+   - **Gemini**: có gói miễn phí. Lấy key ở [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
+   - **ChatGPT**: key OpenAI API còn credit.
+   - **Claude**: dùng Claude Code CLI nếu máy đã cài và đăng nhập (`claude`, rồi `/login`).
+
+   Có thể chọn AI khác nhau cho việc đọc ảnh và việc sáng tác. Bấm **Kiểm tra** để thử kết nối.
+5. Thêm vài video gameplay ở mục **Video nền**. Nên dùng video tự quay hoặc video được dùng tự do. Chưa có video nền thì tool dùng nền tối.
+
+Dữ liệu của bạn nằm ở `%LOCALAPPDATA%\CommentKit`: key (`.env`), `config.local.json`, `inbox`, `backgrounds`, `output` và giọng đọc. Cập nhật hay gỡ CommentKit không đụng tới thư mục này.
+
+## Cách dùng
+
+**Từ ảnh chụp:** lướt Threads, chụp màn hình bài hay cùng các bình luận, rồi thả ảnh vào app (kéo thả, bấm chọn, hoặc dán bằng Ctrl+V). Chọn "các ảnh cùng 1 bài → 1 video" hoặc "mỗi ảnh 1 video". Cũng có thể chép thẳng ảnh vào thư mục inbox: một ảnh lẻ là một video, một thư mục con là một bài.
+
+Khi bật **Tự động**, CommentKit quét inbox 30 giây một lần. Với mỗi bài, tool làm các bước sau:
+1. AI đọc ảnh: viết lại bài bằng lời của nó, thay mọi tên người dùng bằng tên che bịa ngẫu nhiên, viết lại các bình luận hay, thêm bình luận của riêng nó, gán mỗi câu cho một nhân vật, đặt tiêu đề, mô tả và tag. Bài nhạy cảm thì bỏ qua.
+2. Nếu bài có hình hoặc meme, tool tự cắt hình đó ra khỏi ảnh chụp.
+3. VieNeu-TTS đọc từng câu bằng giọng của nhân vật đó.
+4. Dựng video 1080×1920: gameplay phủ kín màn hình, mỗi lúc một thẻ, đổi thẻ đúng lúc giọng đọc tới câu đó.
+5. Ảnh đã đọc chuyển sang `inbox/_done`, nên không bị đọc lại. Ảnh lỗi chuyển sang `inbox/_failed`, bấm **Thử lại** để chạy lại.
+
+**Tự sáng tác:** chọn chủ đề (để ngẫu nhiên, hoặc gõ chủ đề riêng) rồi bấm **Sáng tác**. Tool cũng có thể tự sáng tác khi inbox trống, có giới hạn số video mỗi ngày. Các ý đã làm được ghi nhớ để không lặp lại.
+
+Mỗi video nằm trong một thư mục riêng trong `output/`: `video.mp4`, ảnh thumbnail, `script.json` và `metadata.json`. Trên app, nút **Chép tiêu đề** và **Chép mô tả** chép sẵn chữ để đăng YouTube.
+
+Đóng cửa sổ là CommentKit thoát. Nếu đang làm dở một video, tool làm xong rồi mới thoát. Chế độ tự động chỉ chạy khi cửa sổ đang mở.
+
+## Dòng lệnh
+
+Bộ cài có tuỳ chọn thêm `commentkit` vào PATH:
+
 ```
-Muốn cài chỗ khác thì chạy `$env:COMMENTKIT_DIR = "D:\CommentKit"` trước. Chạy lại lệnh trên để cập nhật bản mới; `.env`, `config.local.json`, `inbox`, `backgrounds`, `output` được giữ nguyên.
+commentkit                     mở cửa sổ app
+commentkit run                 xử lý inbox một lần rồi thoát
+commentkit compose "chủ đề"    sáng tác 1 video
+commentkit script X.json       dựng video từ kịch bản có sẵn
+commentkit install-voices      cài giọng đọc VieNeu
+commentkit doctor              kiểm tra ffmpeg, giọng đọc và key
+```
 
-**Cách 2, tải về:** `git clone https://github.com/hiennv0298/CommentKit.git` (hoặc tải ZIP và giải nén), rồi nhấp đúp `install.bat`.
+`run` và `compose` nhận thêm `--provider gemini|openai|claude`.
 
-Bộ cài tự làm các việc sau:
-1. Cài Python 3.12 và ffmpeg bằng winget nếu máy chưa có.
-2. Tạo `.venv` cho app và `.venv-tts` cho giọng đọc VieNeu-TTS (chạy bằng CPU, không cần GPU).
-3. Tạo thư mục `inbox`, `backgrounds`, `output` và file `.env`.
-4. Tạo shortcut **CommentKit** trên Desktop.
-5. Dựng thử một video mẫu. Lần đầu tool tải model giọng đọc, khoảng 600 MB.
+## Tuỳ chỉnh
 
-Tuỳ chọn khi chạy `install.ps1`:
-- `-VieneuPython <python.exe>`: dùng lại VieNeu đã cài sẵn ở venv khác.
-- `-HfHome <thư mục>`: đổi chỗ lưu model.
-- `-SkipTest`: bỏ bước dựng thử.
-- `-NoShortcut`: không tạo shortcut.
-
-Ví dụ: `powershell -ExecutionPolicy Bypass -File install.ps1 -VieneuPython F:\VieNeu\.venv\Scripts\python.exe`
-
-Sau khi cài: nhấp đúp **CommentKit** trên Desktop. Trong **Cài đặt**, chọn AI (Gemini miễn phí, ChatGPT hoặc Claude) và nhập key.
-
-## Cách hoạt động
-
-**Bạn làm:** lướt Threads, chụp màn hình bài hay (cả bài gốc lẫn bình luận), rồi thả ảnh vào thư mục `inbox`.
-**Tool tự làm phần còn lại:**
-1. Quét `inbox` (mặc định 30 giây một lần). Một ảnh lẻ thành một video, một thư mục con (nhiều ảnh của cùng một bài) cũng thành một video.
-2. Claude (`claude -p`) tự đọc ảnh: viết lại bài, che tên người dùng, viết thêm bình luận hài, gán nhân vật và giọng, đặt tiêu đề, mô tả, tag. Bài nhạy cảm thì bỏ qua.
-3. Nếu bài có hình hoặc meme, tool tự cắt hình đó ra khỏi ảnh chụp.
-4. VieNeu-TTS đọc, mỗi nhân vật một giọng.
-5. Dựng video 1080x1920: gameplay lấy ngẫu nhiên từ thư mục `backgrounds/` phủ kín màn hình, **mỗi lúc một thẻ Threads**, thẻ đổi đúng lúc giọng đọc tới câu đó.
-6. Ảnh đã đọc được chuyển sang `inbox/_done/`, nên lần sau không đọc lại. Ảnh lỗi chuyển sang `inbox/_failed/`, bấm "Thử lại" trên UI để chạy lại.
-
-Video ra ở `output/<thời gian>_<tên>/`: `video.mp4`, `video_thumb.jpg`, `script.json`, `metadata.json`.
-
-## Tự sáng tác (không cần ảnh)
-LLM tự nghĩ ra một bài Threads hư cấu và các bình luận theo chủ đề, rồi dựng video như bình thường.
-- Trên UI: chọn chủ đề (hoặc để ngẫu nhiên, hoặc gõ chủ đề riêng) rồi bấm **Sáng tác**. Có thể bật "Tự sáng tác khi inbox trống", giới hạn số video mỗi ngày.
-- Danh sách chủ đề nằm trong `config.json` → `compose.topics`. Các ý đã làm lưu ở `state/compose_history.json`, LLM được dặn không viết trùng.
-- Mô tả video ghi "nội dung hư cấu".
-
-## Chọn Claude, ChatGPT hay Gemini
-Trong **Cài đặt** chọn riêng cho từng việc: đọc ảnh chụp và tự sáng tác.
-- **Claude:** dùng Claude Code CLI đã đăng nhập.
-- **ChatGPT:** dùng OpenAI API key, nhập trong Cài đặt (lưu vào `.env` là `OPENAI_API_KEY`). Model mặc định là `gpt-4o`, đổi được trong Cài đặt.
-- **Gemini:** dùng Google Gemini API key, có gói miễn phí (giới hạn lượt/phút và lượt/ngày; ở gói miễn phí Google có thể dùng dữ liệu gửi lên để cải thiện sản phẩm). Lấy key ở aistudio.google.com/apikey, nhập trong Cài đặt (lưu vào `.env` là `GEMINI_API_KEY`). Model mặc định là `gemini-flash-latest`. Bị giới hạn lượt/phút thì tool tự chờ rồi thử lại; hết lượt trong ngày thì tool tự tạm dừng.
-Bấm "Kiểm tra Claude", "Kiểm tra OpenAI" hoặc "Kiểm tra Gemini" để thử kết nối.
-
-## Mở giao diện
-Nhấp đúp `start-ui.bat`, trình duyệt sẽ mở http://127.0.0.1:8765. Trên giao diện bạn có thể:
-- Kéo thả ảnh, hoặc dán bằng Ctrl+V. Chọn "các ảnh cùng 1 bài → 1 video" hoặc "mỗi ảnh 1 video".
-- Bật/tắt chế độ tự động, bấm "Quét ngay", kiểm tra Claude đã đăng nhập chưa.
-- Thêm/xoá video nền (gameplay).
-- Xem video đã làm, chép tiêu đề và mô tả để đăng.
-- Đổi đường dẫn thư mục inbox, nền, output (ví dụ trỏ inbox vào một thư mục Google Drive đồng bộ từ điện thoại).
-
-Chạy không cần UI: `.venv\Scripts\python.exe run.py` (xử lý hết inbox rồi thoát), `run.py --compose "chủ đề" --provider openai` (sáng tác 1 video).
-
-## Cần có
-- **Một AI để viết kịch bản:** Gemini (key miễn phí), ChatGPT (key trả phí), hoặc Claude Code CLI đã đăng nhập (chạy `claude` rồi `/login`). Nếu AI báo lỗi key hoặc chưa đăng nhập, tool tự tạm dừng và giữ nguyên ảnh trong inbox.
-- **Video nền gameplay** trong `backgrounds/`. Nên dùng gameplay bạn tự quay hoặc video ghi rõ được dùng tự do. Chưa có video nền thì tool dùng nền tối.
-- VieNeu-TTS: bộ cài tự cài vào `.venv-tts`. Đường dẫn lưu trong `config.local.json` → `tts`.
-
-## Tuỳ chỉnh (`config.json`)
-Chỉnh riêng cho máy mình thì ghi vào `config.local.json`: file này đè lên `config.json` và không bị ghi đè khi cập nhật. Model OpenAI/Gemini đổi trên UI cũng được lưu vào đây.
-- `channel_name`, `channel_handle`: tên kênh và handle in dưới thẻ.
-- `characters`: nhân vật, giọng VieNeu và tính cách.
+Ghi phần chỉnh riêng vào `config.local.json` trong thư mục dữ liệu. File này đè lên cấu hình mặc định và không bị ghi đè khi cập nhật.
+- `channel_name`, `channel_handle`: tên kênh để AI viết, và handle in dưới thẻ.
+- `characters`: dàn nhân vật, mỗi nhân vật có giọng VieNeu, tính cách và hiệu ứng giọng (không bắt buộc).
 - `video.max_comments`, `video.target_sec`: số bình luận và độ dài video.
-- `video.bgm`: đường dẫn nhạc nền (không bắt buộc).
+- `tts.speed`: tốc độ đọc (mặc định 1.2).
+- `compose.topics`: danh sách chủ đề tự sáng tác.
+- `video.bgm`, `video.bgm_volume`: nhạc nền (không bắt buộc).
 
-## Ghi chú
-- `src/threads_api.py` là phần tìm bài qua Threads API, đang để dành. Hiện app chưa có quyền `threads_keyword_search` nên chưa dùng được.
-- Chưa có bước tự upload lên YouTube.
-- Khi đăng, bật mục công bố "nội dung đã chỉnh sửa hoặc tổng hợp" vì video dùng giọng AI.
+Ví dụ:
+```json
+{ "channel_handle": "kenhcuatoi", "tts": { "speed": 1.1 } }
+```
+
+## Trước khi đăng
+
+- Bật mục công bố **nội dung đã chỉnh sửa hoặc tổng hợp** trên YouTube, vì video dùng giọng AI.
+- Mô tả video đã ghi sẵn là nội dung dựng lại hoặc hư cấu, tên người dùng đã ẩn và giọng đọc là AI.
+- Ở gói miễn phí của Gemini, Google có thể dùng dữ liệu gửi lên, kể cả ảnh chụp, để cải thiện sản phẩm.
+
+## Chạy từ mã nguồn
+
+```
+git clone https://github.com/hiennv0298/CommentKit.git
+cd CommentKit
+run.cmd
+```
+Lần đầu chạy, `run.cmd` tạo `.venv` và cài thư viện. Khi chạy từ mã nguồn, thư mục dữ liệu chính là thư mục dự án. Máy cần có ffmpeg trong PATH (`winget install Gyan.FFmpeg`).
+
+Đóng gói bộ cài bằng `powershell -ExecutionPolicy Bypass -File scripts\build.ps1`, cần Inno Setup 6 (`winget install JRSoftware.InnoSetup`). Đẩy tag `v*` lên GitHub thì GitHub Actions tự đóng gói và gắn vào Release. Vẽ lại icon bằng `python scripts/make_icons.py`.
+
+## Giấy phép
+
+MIT. VieNeu-TTS được tải về lúc cài giọng đọc, theo giấy phép riêng của nó (Apache 2.0).

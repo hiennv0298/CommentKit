@@ -1,10 +1,13 @@
 """Một chỗ duy nhất gọi mô hình ngôn ngữ. provider:
 - "claude": Claude Code CLI (claude -p), đọc ảnh bằng công cụ Read.
-- "openai": OpenAI Chat Completions (ChatGPT), ảnh gửi kèm dạng base64. Key: OPENAI_API_KEY trong .env."""
-import base64, mimetypes, os, shutil, subprocess
+- "openai": OpenAI Chat Completions (ChatGPT), ảnh gửi kèm dạng base64. Key: OPENAI_API_KEY trong .env.
+- "gemini": Google Gemini API, ảnh gửi kèm trực tiếp. Key: GEMINI_API_KEY trong .env."""
+import base64, mimetypes, os, shutil, subprocess, time
 import requests
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from .paths import NO_WINDOW, home
+
+ROOT = str(home())   # .env nằm trong thư mục dữ liệu (xem paths.home)
 
 
 class LLMError(RuntimeError):
@@ -49,7 +52,7 @@ def _claude(prompt, cfg, images):
     c = cfg["claude"]
     exe = shutil.which(c["cmd"]) or shutil.which(c["cmd"] + ".cmd")
     if not exe:
-        raise LLMError("Không tìm thấy lệnh claude trong PATH")
+        raise LLMError("Không tìm thấy lệnh claude trong PATH (cài Claude Code, hoặc chọn Gemini/ChatGPT trong Cài đặt)")
     cmd = [exe, "-p", "--output-format", "text"]
     if images:
         prompt = ("Dùng công cụ Read đọc lần lượt các ảnh sau (theo thứ tự, ảnh đầu là số 0):\n"
@@ -59,7 +62,7 @@ def _claude(prompt, cfg, images):
             cmd += ["--add-dir", d]
     if c.get("model"):
         cmd += ["--model", c["model"]]
-    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace",
+    r = subprocess.run(cmd, input=prompt, creationflags=NO_WINDOW, capture_output=True, text=True, encoding="utf-8", errors="replace",
                        timeout=c.get("timeout_sec", 240))
     out = (r.stdout or "") + (r.stderr or "")
     if r.returncode != 0:
@@ -126,7 +129,6 @@ def _gemini(prompt, cfg, images):
     }
     if g.get("temperature") is not None:
         body["generationConfig"]["temperature"] = g["temperature"]
-    import time
     # model chính trước, quá tải (503/timeout) thì lần lượt thử model dự phòng
     models = [g.get("model") or "gemini-flash-latest"]
     models += [m for m in g.get("fallback_models", ["gemini-flash-latest", "gemini-flash-lite-latest"]) if m not in models]

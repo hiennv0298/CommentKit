@@ -1,10 +1,9 @@
-"""Viết kịch bản bình luận hài bằng LLM (Claude CLI hoặc OpenAI, xem llm.py).
+"""Viết kịch bản bình luận hài bằng AI (Claude CLI, OpenAI hoặc Gemini, xem llm.py).
 - write_script_from_images: đọc ảnh chụp màn hình Threads (bài + bình luận) rồi viết lại.
-- write_script_original: tự sáng tác một bài + bình luận theo chủ đề (không cần ảnh).
-- write_script: chọn từ danh sách bài lấy qua Threads API (để dành)."""
+- write_script_original: tự sáng tác một bài + bình luận theo chủ đề (không cần ảnh)."""
 import json, random, re
 
-from llm import generate, check as llm_check, AuthError, LLMError  # noqa: F401
+from .llm import generate, check as llm_check, AuthError, LLMError  # noqa: F401
 
 RULES = """KÊNH: YouTube Shorts tiếng Việt "{channel}". Mỗi video là một màn hình chat kiểu Threads (tên người dùng đã ẩn): \
 một bài đăng, rồi các "nhân vật" vào bình luận hài, mỗi nhân vật một giọng đọc AI.
@@ -54,13 +53,6 @@ COMPOSE_TASK = """NHIỆM VỤ: TỰ SÁNG TÁC một bài đăng kiểu Threads
 
 """
 
-API_TASK = """NHIỆM VỤ: Từ danh sách ứng viên dưới đây, chọn ĐÚNG 1 bài có tiềm năng hài nhất, dễ hiểu với người Việt.
-ỨNG VIÊN (JSON):
-{candidates}
-
-"""
-
-
 def _rules(cfg, pick_hint, extra="", disclaimer="ghi chú: nội dung dựng lại, tên người dùng đã ẩn, giọng đọc AI"):
     v = cfg["video"]
     chars = "\n".join(f'  - {k}: {c["label"]}' for k, c in cfg["characters"].items())
@@ -81,7 +73,7 @@ def _extract_json(s):
     try:
         return json.loads(s)
     except ValueError:
-        raise LLMError("Kết quả không phải JSON hợp lệ: " + s[:300])
+        raise LLMError("Kết quả không phải JSON hợp lệ: " + s[:300]) from None
 
 
 def _validate(data, cfg, raw):
@@ -115,10 +107,3 @@ def write_script_original(cfg, history, provider="claude", topic=None):
     data["topic"] = topic
     data.pop("post_image", None)
     return data
-
-
-def write_script(cands, cfg, provider="claude"):
-    slim = [{"id": p["id"], "text": p.get("text", ""), "real_comments": p.get("_replies", [])[:15]} for p in cands]
-    prompt = API_TASK.format(candidates=json.dumps(slim, ensure_ascii=False, indent=1)) + _rules(cfg, "<id bài đã chọn>")
-    raw = generate(prompt, cfg, provider)
-    return _validate(_extract_json(raw), cfg, raw)

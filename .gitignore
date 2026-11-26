@@ -1,12 +1,19 @@
-# bí mật và cấu hình riêng từng máy
+# secrets and this PC's own settings
 .env
 config.local.json
-# môi trường, cache model
+# environments, caches, build output
 .venv/
+.venv-build/
 .venv-tts/
 .cache/
+tts/
 __pycache__/
-# dữ liệu người dùng: ảnh chụp, video nền, video ra
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+# user data: screenshots, background videos, rendered videos
 inbox/*
 !inbox/.gitkeep
 backgrounds/*
@@ -14,5 +21,5 @@ backgrounds/*
 output/
 state/
 *.log
-# kịch bản làm từ ảnh chụp thật, không đưa lên git
+# scripts made from real screenshots stay local
 samples/joke-*.json

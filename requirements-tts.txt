@@ -1,2 +1,0 @@
-# Giọng đọc VieNeu-TTS (cài vào .venv-tts riêng, chạy CPU bằng onnxruntime)
-vieneu==3.8.5

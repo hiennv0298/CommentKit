@@ -1,13 +1,15 @@
-"""Phần lõi dùng chung cho run.py và app.py: quét thư mục inbox, đọc ảnh, dựng video, đánh dấu đã đọc."""
+"""Phần lõi dùng chung cho giao diện và dòng lệnh: quét thư mục inbox, đọc ảnh, dựng video, đánh dấu đã đọc."""
 import json, os, re, shutil, subprocess, time, traceback
 from datetime import datetime
 
-from write_script import write_script_from_images, write_script_original
-from llm import AuthError, LLMError  # noqa: F401
-from render import render
-from crop import detect_photo
+from .write_script import write_script_from_images, write_script_original
+from .llm import AuthError, LLMError  # noqa: F401
+from .render import render
+from .crop import detect_photo
+from .paths import NO_WINDOW, PKG, home
+from . import voice
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = str(home())   # thư mục dữ liệu (xem paths.home)
 IMG_EXT = (".png", ".jpg", ".jpeg", ".webp")
 SETTINGS_PATH = os.path.join(ROOT, "state", "settings.json")
 DEFAULT_SETTINGS = dict(
@@ -53,9 +55,10 @@ def save_local_cfg(patch):
 
 
 def load_cfg():
-    cfg = _merge(json.load(open(os.path.join(ROOT, "config.json"), encoding="utf-8-sig")), load_local_cfg())
+    cfg = _merge(json.load(open(os.path.join(PKG, "config.json"), encoding="utf-8-sig")), load_local_cfg())
     t = cfg["tts"]
-    t["python"], t["hf_home"] = _abs(t["python"]), _abs(t["hf_home"])
+    t["python"] = _abs(t.get("python")) or str(voice.managed_python())
+    t["hf_home"] = _abs(t.get("hf_home")) or str(voice.default_hf_home())
     return cfg
 
 
@@ -168,9 +171,9 @@ def tts(script, cfg, out_dir):
     job = os.path.join(out_dir, "tts_job.json")
     json.dump(dict(gap=cfg["tts"]["gap_sec"], speed=cfg["tts"].get("speed", 1.0), lines=lines), open(job, "w", encoding="utf-8"), ensure_ascii=False)
     if not os.path.exists(cfg["tts"]["python"]):
-        raise RuntimeError("Chưa cài VieNeu-TTS (không thấy " + cfg["tts"]["python"] + "): chạy install.bat")
+        raise RuntimeError("Chưa cài giọng đọc VieNeu: bấm \"Cài giọng đọc\" trên giao diện (hoặc chạy: commentkit install-voices)")
     env = dict(os.environ, HF_HOME=cfg["tts"]["hf_home"], PYTHONIOENCODING="utf-8")
-    r = subprocess.run([cfg["tts"]["python"], "-I", os.path.join(ROOT, "src", "tts_vieneu.py"), job, out_dir],
+    r = subprocess.run([cfg["tts"]["python"], "-I", str(voice.TTS_SCRIPT), job, out_dir], creationflags=NO_WINDOW,
                        env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0 or "DONE" not in r.stdout:
         raise RuntimeError("TTS lỗi:\n" + r.stdout[-600:] + r.stderr[-1200:])
