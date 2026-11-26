@@ -17,6 +17,8 @@ Tool làm YouTube Shorts "bình luận hài" trên Windows. Mỗi video đi từ
 
 Dữ liệu của bạn nằm ở `%LOCALAPPDATA%\CommentKit`: key (`.env`), `config.local.json`, `inbox`, `backgrounds`, `output` và giọng đọc. Cập nhật hay gỡ CommentKit không đụng tới thư mục này.
 
+**Cập nhật:** CommentKit tự kiểm tra bản mới trên GitHub khi mở app và vài tiếng một lần. Có bản mới thì một thanh báo hiện ra. Với bản cài bằng bộ cài, bấm **Cập nhật ngay**: app tải bộ cài mới, đối chiếu mã SHA-256 trong `SHA256SUMS.txt`, cài im lặng rồi tự mở lại, cửa sổ đang mở tự chuyển sang bản mới. Bản portable thì nút này mở trang Releases để tải. Bấm số phiên bản trên thanh trên cùng để kiểm tra ngay; tắt việc tự kiểm tra trong Cài đặt. App chỉ gửi một yêu cầu tới GitHub, không gửi gì về bạn.
+
 ## Cách dùng
 
 **Từ ảnh chụp:** lướt Threads, chụp màn hình bài hay cùng các bình luận, rồi thả ảnh vào app (kéo thả, bấm chọn, hoặc dán bằng Ctrl+V). Chọn "các ảnh cùng 1 bài → 1 video" hoặc "mỗi ảnh 1 video". Cũng có thể chép thẳng ảnh vào thư mục inbox: một ảnh lẻ là một video, một thư mục con là một bài.

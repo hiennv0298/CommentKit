@@ -22,6 +22,7 @@ DEFAULT_SETTINGS = dict(
     provider_compose="claude",   # ai tự sáng tác: "claude" | "openai" | "gemini"
     compose_auto=False,          # tự sáng tác khi inbox trống
     compose_per_day=3,
+    check_updates=True,          # tự kiểm tra bản mới trên GitHub
 )
 HISTORY_PATH = os.path.join(ROOT, "state", "compose_history.json")
 STABLE_SEC = 8      # file phải "yên" từng này giây (đã chép xong) mới xử lý

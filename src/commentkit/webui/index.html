@@ -67,12 +67,21 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
 #lightbox img{max-width:92vw;max-height:92vh;border-radius:8px}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#222;border:1px solid var(--line);padding:9px 16px;border-radius:10px;opacity:0;transition:.2s;pointer-events:none}
 .toast.on{opacity:1}
+#updbar{margin:12px 20px 0;padding:10px 14px;border-radius:10px;background:#1c1a0f;border:1px solid #5c4d0a;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#updbar[hidden]{display:none}
+#updbar .sub{color:var(--mut);font-size:13px}
+#ver{cursor:pointer}
+.modal{position:fixed;inset:0;z-index:30;background:#000a;display:grid;place-items:center;padding:20px}
+.modal[hidden]{display:none}
+.modal .card{width:min(620px,100%);max-height:86vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+.modal h2{margin:0 0 10px;font-size:18px}
+.notes{white-space:pre-wrap;color:#d6d9e0;font-size:14px;line-height:1.55}
 </style>
 </head>
 <body>
 <header>
   <h1><img src="/icon-192.png" alt="" width="28" height="28">Comment<b>Kit</b></h1>
-  <span id="ver" class="pill" title="Phiên bản"></span>
+  <span id="ver" class="pill" title="Bấm để kiểm tra bản mới"></span>
   <span id="status" class="pill">…</span>
   <label class="sw" title="Tự quét thư mục inbox"><input type="checkbox" id="auto"><i></i>Tự động</label>
   <span id="next" class="pill" style="display:none"></span>
@@ -82,6 +91,12 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
   <span id="llmRead" class="pill">Đọc ảnh: ?</span>
   <span id="llmCompose" class="pill">Sáng tác: ?</span>
 </header>
+<div id="updbar" hidden>
+  <b id="updTitle"></b> <span class="sub" id="updSub"></span><span class="spacer"></span>
+  <button class="sm" id="updNotes">Có gì mới</button>
+  <button class="pri sm" id="updGo">Cập nhật ngay</button>
+  <button class="sm" id="updLater">Để sau</button>
+</div>
 <div class="banner" id="banner"></div>
 <div class="banner info" id="voiceBanner"><span id="voiceMsg"></span> <button class="pri sm" id="voiceInstall">Cài giọng đọc</button></div>
 
@@ -153,6 +168,8 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
         <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="sm" data-chk="claude">Kiểm tra Claude</button><button class="sm" data-chk="openai">Kiểm tra OpenAI</button><button class="sm" data-chk="gemini">Kiểm tra Gemini</button></div>
         <label class="f">Python của VieNeu <span id="ttsState"></span> · để trống để dùng bản CommentKit tự cài</label><input class="t" id="sTts" placeholder="C:\duong\dan\venv\Scripts\python.exe">
         <div class="empty" id="homeInfo"></div>
+        <label class="f" style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="sUpd"> Tự kiểm tra bản mới (khi mở app và vài tiếng một lần)</label>
+        <div class="empty" id="updNote"></div><button class="sm" id="updCheck">Kiểm tra bản mới</button>
         <div style="margin-top:10px"><button class="pri" id="save">Lưu</button></div>
       </details>
     </div>
@@ -172,19 +189,26 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
 
 <div id="lightbox"><img alt=""></div>
 <div class="toast" id="toast"></div>
+<div class="modal" id="notes" hidden><div class="card"><h2 id="notesTitle">Có gì mới</h2><div class="notes" id="notesBody"></div>
+  <div style="display:flex;margin-top:16px"><span class="spacer"></span><button class="pri" id="notesOk">OK</button></div></div></div>
+<div class="modal" id="gone" hidden><div class="card" style="text-align:center"><img src="/icon-192.png" alt="" width="64" height="64">
+  <h2 id="goneTitle" style="margin-top:12px"></h2><p class="empty" id="goneText"></p>
+  <button class="pri" id="goneClose">Đóng cửa sổ này</button></div></div>
 
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const post = (u, b) => fetch(u, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(b||{})}).then(r => r.json()).catch(() => ({ok:false, msg:"Không gửi được yêu cầu"}));
 function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("on"),2200); }
-let shownOutputs = "", settingsFilled = false;
+let shownOutputs = "", settingsFilled = false, FAILS = 0, GONE = false, UPDATING = false, UPD = null, WN_SHOWN = false;
 
 function thumbs(imgs){ return `<div class="thumbs">${imgs.slice(0,3).map(u=>`<img src="${esc(u)}" loading="lazy">`).join("")}</div>`; }
 
 async function refresh(){
   let s;
-  try { s = await fetch("/api/state").then(r => r.json()); } catch { $("#status").textContent="Mất kết nối"; $("#status").className="pill bad"; return; }
+  if (GONE) return;
+  try { s = await fetch("/api/state").then(r => r.json()); FAILS = 0; }
+  catch { $("#status").textContent="Mất kết nối"; $("#status").className="pill bad"; if (UPDATING || ++FAILS >= 3) showGone(); return; }
   const st = $("#status");
   if (s.current){ st.textContent = "Đang làm: " + s.current; st.className = "pill run"; }
   else { st.textContent = s.settings.auto ? "Đang chờ ảnh mới" : "Tạm dừng"; st.className = "pill" + (s.settings.auto ? " ok" : ""); }
@@ -207,7 +231,7 @@ async function refresh(){
     $("#topic").innerHTML = `<option value="">Chủ đề ngẫu nhiên</option>` + s.topics.map(t => `<option>${esc(t)}</option>`).join("");
   }
   const b = $("#banner"); b.style.display = s.error ? "block" : "none"; b.textContent = s.error || "";
-  $("#ver").textContent = "v" + s.version;
+  if (!UPD) $("#ver").textContent = "v" + s.version;
   const v = s.voice, vb = $("#voiceBanner"), running = v.job === "running";
   vb.style.display = v.ok && !running ? "none" : "block";
   $("#voiceInstall").style.display = running ? "none" : "";
@@ -266,6 +290,7 @@ async function refresh(){
     $("#sOut").value = s.settings.output_dir; $("#sInt").value = s.settings.interval_sec;
     $("#pRead").value = s.settings.provider_read; $("#pComp").value = s.settings.provider_compose; $("#oModel").value = s.openai_model || ""; $("#gModel").value = s.gemini_model || "";
     $("#sTts").value = s.voice.managed ? "" : s.voice.python;
+    $("#sUpd").checked = s.settings.check_updates !== false;
   }
 }
 
@@ -306,7 +331,8 @@ $("#bgFile").onchange = async e => {
 $("#save").onclick = () => post("/api/settings", {inbox_dir:$("#sInbox").value, bg_dir:$("#sBg").value, output_dir:$("#sOut").value,
     interval_sec:+$("#sInt").value, provider_read:$("#pRead").value, provider_compose:$("#pComp").value,
     openai_key:$("#oKey").value.trim(), openai_model:$("#oModel").value.trim(),
-    gemini_key:$("#gKey").value.trim(), gemini_model:$("#gModel").value.trim(), tts_python:$("#sTts").value.trim()})
+    gemini_key:$("#gKey").value.trim(), gemini_model:$("#gModel").value.trim(), tts_python:$("#sTts").value.trim(),
+    check_updates:$("#sUpd").checked})
   .then(r => { if (!r.ok) return toast(r.msg || "Chưa lưu được"); toast("Đã lưu"); $("#oKey").value=""; $("#gKey").value=""; settingsFilled=false; shownOutputs=""; refresh(); });
 
 document.body.addEventListener("click", async e => {
@@ -324,6 +350,82 @@ $("#lightbox").onclick = () => $("#lightbox").style.display = "none";
 $("#voiceInstall").onclick = () => post("/api/voice/install").then(() => { toast("Đang cài giọng đọc…"); refresh(); });
 // báo app khi đóng cửa sổ để app tự thoát (đợi xong video đang làm)
 addEventListener("pagehide", () => navigator.sendBeacon("/api/bye"));
+
+// ---------------------------------------------------------------- cập nhật
+function closeWindow(){
+  window.close();
+  setTimeout(() => { $("#goneText").textContent = "Cửa sổ không tự đóng được. Đóng bằng nút X ở góc hoặc Alt+F4."; }, 400);
+}
+function showGone(){
+  if (GONE) return; GONE = true;
+  $("#goneTitle").textContent = UPDATING ? "Đang cài bản cập nhật…" : "CommentKit không chạy";
+  $("#goneText").textContent = UPDATING
+    ? "Bản cũ đã đóng và bản mới đang được cài. Cửa sổ này sẽ tự tải lại vào bản mới sau vài giây."
+    : "Cửa sổ này mất kết nối với CommentKit (app đã tắt hoặc vừa cập nhật). Đóng cửa sổ này rồi mở lại CommentKit từ Start menu hoặc Desktop.";
+  $("#gone").hidden = false;
+  if (UPDATING && UPD) waitForNewVersion(UPD.current);
+}
+// Sau "Cập nhật ngay", bản cũ thoát và bản mới chạy lại trên cùng cổng: chờ rồi tải lại cửa sổ vào bản mới.
+async function waitForNewVersion(from, since = Date.now()){
+  try {
+    const v = (await fetch("/api/ping", {cache:"no-store"}).then(r => r.json())).version;
+    if (v && v !== from) { location.reload(); return; }
+  } catch (e) { /* chưa chạy lại */ }
+  if (Date.now() - since > 5 * 60 * 1000) {
+    $("#goneTitle").textContent = "Bản cập nhật chưa mở lại CommentKit";
+    $("#goneText").textContent = "Đóng cửa sổ này, mở CommentKit từ Start menu hoặc Desktop rồi bấm Cập nhật ngay lần nữa.";
+    return;
+  }
+  setTimeout(() => waitForNewVersion(from, since), 1500);
+}
+const getUpd = () => fetch("/api/update").then(r => r.json());
+function showNotesBox(title, body, seen){
+  $("#notesTitle").textContent = title; $("#notesBody").textContent = body || "";
+  $("#notes").hidden = false; if (seen) $("#notes").dataset.seen = "1";
+}
+function showUpdate(u){
+  UPD = u; $("#ver").textContent = "v" + u.current + (u.newer ? " •" : "");
+  if (u.whats_new && u.whats_new.notes && !WN_SHOWN) { WN_SHOWN = true; showNotesBox(`Có gì mới trong ${u.whats_new.version}`, u.whats_new.notes, true); }
+  const p = u.progress || {}, active = ["downloading", "verifying", "restarting", "error"].includes(p.phase);
+  let later = null; try { later = sessionStorage.getItem("ck-later"); } catch (e) {}
+  $("#updbar").hidden = !(active || (u.newer && later !== u.latest));
+  $("#updTitle").textContent = u.newer ? `Đã có CommentKit ${u.latest}` : "";
+  $("#updSub").textContent = p.phase === "downloading" ? `Đang tải ${p.progress}%` : p.phase === "verifying" ? "Đang kiểm tra file tải về…"
+    : p.phase === "restarting" ? "Đang cài, CommentKit sẽ tự mở lại…" : p.phase === "error" ? p.error : `Bạn đang dùng ${u.current}.`;
+  $("#updGo").textContent = u.can_install ? "Cập nhật ngay" : u.mode === "python" ? "Cách cập nhật" : "Tải về";
+  if (p.phase === "restarting") UPDATING = true;
+  if (["downloading", "verifying", "restarting"].includes(p.phase)) setTimeout(async () => showUpdate(await getUpd()), 800);
+}
+function updNote(u){
+  const when = u.checked_at ? new Date(u.checked_at * 1000).toLocaleString("vi-VN") : "chưa";
+  $("#updNote").textContent = u.error ? u.error
+    : u.newer ? `Đã có CommentKit ${u.latest} (bạn đang dùng ${u.current}).`
+    : `Bạn đang dùng bản mới nhất (${u.current}). Lần kiểm tra cuối: ${when}.`;
+}
+async function checkUpdates(){
+  $("#updNote").textContent = "Đang hỏi GitHub…";
+  const u = await post("/api/update/check", {force:true});
+  try { sessionStorage.removeItem("ck-later"); } catch (e) {}
+  showUpdate(u); updNote(u);
+  if (!u.newer) toast(u.error || `Bạn đang dùng bản mới nhất (${u.current})`);
+}
+async function installUpdate(){
+  if (UPD.can_install) {
+    const r = await post("/api/update/install");
+    if (!r.ok) return toast(r.msg || "Chưa cập nhật được");
+    UPDATING = true; setTimeout(async () => showUpdate(await getUpd()), 500);
+  } else if (UPD.mode === "python") {
+    showNotesBox("Cập nhật", "Bạn đang chạy từ mã nguồn. Chạy:\n  git pull\n  run.cmd");
+  } else post("/api/link", {url: UPD.page});
+}
+$("#ver").onclick = checkUpdates; $("#updCheck").onclick = checkUpdates;
+$("#updGo").onclick = installUpdate;
+$("#updLater").onclick = () => { try { sessionStorage.setItem("ck-later", UPD.latest); } catch (e) {} $("#updbar").hidden = true; };
+$("#updNotes").onclick = () => showNotesBox(`Có gì mới trong ${UPD.latest}`, UPD.notes);
+$("#notesOk").onclick = async () => { $("#notes").hidden = true; if ($("#notes").dataset.seen) { delete $("#notes").dataset.seen; await post("/api/update/seen"); } };
+$("#goneClose").onclick = closeWindow;
+getUpd().then(u => { showUpdate(u); updNote(u); if (u.enabled) post("/api/update/check", {force:false}).then(u2 => { showUpdate(u2); updNote(u2); }); });
+setInterval(() => { if (!GONE) getUpd().then(showUpdate).catch(() => {}); }, 30 * 60 * 1000);
 refresh(); setInterval(refresh, 2000);
 </script>
 </body>

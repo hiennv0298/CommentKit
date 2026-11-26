@@ -20,7 +20,7 @@ from flask import Flask, abort, jsonify, request, send_from_directory
 from werkzeug.serving import make_server
 from werkzeug.utils import secure_filename
 
-from . import __version__, pipeline as P, voice
+from . import __version__, pipeline as P, updates, voice
 from .llm import has_gemini_key, has_openai_key, set_env
 from .paths import PKG, add_bundled_tools, home
 from .render import VIDEO_EXT
@@ -29,8 +29,10 @@ from .write_script import check_llm
 WEBUI = PKG / "webui"
 PREFERRED_PORT = 8765   # cố định để cửa sổ giữ địa chỉ giữa các lần mở; bận thì lấy cổng ngẫu nhiên
 SERVER_FILE = "server.json"
+RELAUNCH_FILE = "relaunch.json"   # cổng của bản cũ, để bản mới mở lại đúng cửa sổ sau khi cập nhật
 IDLE_EXIT = 150         # cửa sổ thu nhỏ lâu chỉ gọi /api/state 1 lần/phút: chờ quá 2 lần như vậy
 app = Flask(__name__, static_folder=None)
+SERVER = None
 
 
 class Worker(threading.Thread):
@@ -54,7 +56,8 @@ class Worker(threading.Thread):
 
     @property
     def busy(self):
-        return bool(self.current or self.compose_req or self.voice_req or self.voice_job == "running")
+        return bool(self.current or self.compose_req or self.voice_req or self.voice_job == "running"
+                    or updates.PROGRESS["phase"] in ("downloading", "verifying"))
 
     def run(self):
         self.log(f"CommentKit {__version__} sẵn sàng. Inbox:", self.settings["inbox_dir"])
@@ -269,6 +272,8 @@ def set_settings():
         patch["tts"] = {"python": py.replace("\\", "/")}
     if patch:
         P.save_local_cfg(patch)
+    if "check_updates" in body:
+        W.settings["check_updates"] = bool(body["check_updates"])
     if "interval_sec" in body:
         W.settings["interval_sec"] = max(5, int(body["interval_sec"]))
     for k in ("inbox_dir", "bg_dir", "output_dir"):
@@ -276,6 +281,42 @@ def set_settings():
             os.makedirs(body[k], exist_ok=True)
             W.settings[k] = os.path.abspath(body[k])
     P.save_settings(W.settings)
+    return jsonify(ok=True)
+
+
+@app.get("/api/update")
+def update_state():
+    return jsonify(dict(updates.status(), enabled=W.settings.get("check_updates", True)))
+
+
+@app.post("/api/update/check")
+def update_check():
+    # {force: false} = dùng câu trả lời đã nhớ trong 1 giờ
+    updates.check(force=(request.json or {}).get("force", True) is not False)
+    return update_state()
+
+
+@app.post("/api/update/seen")
+def update_seen():
+    updates.mark_seen()
+    return jsonify(ok=True)
+
+
+@app.post("/api/update/install")
+def update_install():
+    if W.busy:
+        return jsonify(ok=False, msg="Đợi CommentKit làm xong việc đang chạy rồi hãy cập nhật."), 409
+    if updates.PROGRESS["phase"] not in ("downloading", "verifying", "restarting"):
+        threading.Thread(target=_install_update, daemon=True).start()
+    return jsonify(ok=True)
+
+
+@app.post("/api/link")
+def open_link():
+    url = str((request.json or {}).get("url", ""))
+    if not url.startswith(f"https://github.com/{updates.REPO}/"):   # chỉ mở trang release của CommentKit
+        abort(400)
+    webbrowser.open(url)
     return jsonify(ok=True)
 
 
@@ -358,6 +399,50 @@ def media(kind, p):
 
 # ---------------------------------------------------------------- cửa sổ và vòng đời
 
+def _install_update():
+    def remember_port():
+        # Bản mới chạy lại trên đúng cổng này, nên cửa sổ đang mở tự tải lại vào bản mới thay vì mở thêm
+        # cửa sổ thứ hai cạnh cửa sổ chết. Ghi trước khi chạy bộ cài: bộ cài có thể đóng app ngay.
+        if SERVER:
+            try:
+                (home() / "state" / RELAUNCH_FILE).write_text(json.dumps(
+                    {"port": SERVER.server_port, "at": time.time(), "from": __version__}), encoding="utf-8")
+            except OSError:
+                pass
+
+    def quit_soon():
+        if SERVER:
+            threading.Timer(1.0, SERVER.shutdown).start()   # để trang kịp đọc trạng thái "restarting"
+
+    try:
+        updates.download_and_install(quit_soon, remember_port)
+    except updates.UpdateError:
+        pass   # lỗi nằm trong updates.PROGRESS để trang hiện ra
+
+
+def _take_relaunch():
+    """Cổng bản cũ đã dùng, nếu lần mở này là lần mở lại sau khi cập nhật trong app (trong 10 phút)."""
+    p = home() / "state" / RELAUNCH_FILE
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        p.unlink(missing_ok=True)
+        if isinstance(data, dict) and time.time() - float(data.get("at") or 0) < 600:
+            return int(data["port"])
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def _open_window_unless_reloaded(url, wait=15):
+    """Sau khi cập nhật, cửa sổ cũ tự tải lại vào bản mới; chỉ mở cửa sổ mới nếu nó không quay lại."""
+    end = time.monotonic() + wait
+    while time.monotonic() < end:
+        if Presence.seen:
+            return
+        time.sleep(0.5)
+    open_window(url)
+
+
 def _browser():
     for env in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"):
         base = os.environ.get(env)
@@ -420,6 +505,7 @@ def _ensure_streams():
 
 
 def main(open_ui=True):
+    global SERVER
     _ensure_streams()
     add_bundled_tools()
     existing = _running_instance()
@@ -427,11 +513,13 @@ def main(open_ui=True):
         if open_ui:
             open_window(existing)
         return 0
-    port = int(os.environ.get("COMMENTKIT_PORT") or PREFERRED_PORT)
+    relaunch = _take_relaunch()
+    port = int(os.environ.get("COMMENTKIT_PORT") or relaunch or PREFERRED_PORT)
     try:
         server = make_server("127.0.0.1", port, app, threaded=True)
-    except OSError:
-        server = make_server("127.0.0.1", 0, app, threaded=True)
+    except OSError:   # cổng đang bận: chạy bình thường, mở cửa sổ mới
+        server, relaunch = make_server("127.0.0.1", 0, app, threaded=True), None
+    SERVER = server
     url = f"http://127.0.0.1:{server.server_port}/"
     try:
         _server_file().parent.mkdir(parents=True, exist_ok=True)
@@ -439,9 +527,13 @@ def main(open_ui=True):
     except OSError:
         pass
     W.start()
+    updates.start_background_check(lambda: W.settings.get("check_updates", True))
     if open_ui and not os.environ.get("COMMENTKIT_NO_WINDOW"):
         threading.Thread(target=_watchdog, args=(server,), daemon=True).start()
-        open_window(url)
+        if relaunch:
+            threading.Thread(target=_open_window_unless_reloaded, args=(url,), daemon=True).start()
+        else:
+            open_window(url)
     print(f"CommentKit đang chạy ở {url}  (đóng cửa sổ app để thoát)", flush=True)
     try:
         server.serve_forever()

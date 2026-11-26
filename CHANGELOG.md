@@ -3,6 +3,15 @@
 Mục của mỗi phiên bản là ghi chú phát hành trên trang GitHub Releases.
 Thêm mục `## <phiên bản>` ở đây trước khi đẩy tag `v<phiên bản>`.
 
+## 0.1.1
+
+- **Tự cập nhật trong app.** CommentKit kiểm tra GitHub có bản mới không khi mở app và vài tiếng một lần, rồi hiện thanh báo kèm ghi chú phát hành. Với bản cài bằng bộ cài, nút **Cập nhật ngay** tải bộ cài mới, đối chiếu mã SHA-256, cài im lặng rồi mở lại CommentKit. Cửa sổ đang mở tự tải lại vào bản mới, không mở thêm cửa sổ thứ hai.
+- Cửa sổ **Có gì mới** hiện ngay sau khi cập nhật.
+- Bấm số phiên bản trên thanh trên cùng (hoặc nút **Kiểm tra bản mới** trong Cài đặt) để kiểm tra ngay.
+- Có thể tắt việc tự kiểm tra trong **Cài đặt**.
+- Cửa sổ mất kết nối với app (app đã tắt) giờ báo rõ và có nút **Đóng cửa sổ này**.
+- Bản 0.1.0 chưa có tính năng tự cập nhật: lần này cần tải `CommentKit-Setup-0.1.1.exe` cài đè lên. Dữ liệu vẫn giữ nguyên. Từ bản sau, app tự cập nhật.
+
 ## 0.1.0
 
 Bản phát hành đầu tiên.
