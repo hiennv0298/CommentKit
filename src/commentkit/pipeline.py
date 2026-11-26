@@ -1,11 +1,13 @@
 """Phần lõi dùng chung cho giao diện và dòng lệnh: quét thư mục inbox, đọc ảnh, dựng video, đánh dấu đã đọc."""
 import json, os, re, shutil, subprocess, time, traceback
+
+from PIL import Image
 from datetime import datetime
 
 from .write_script import write_script_from_images, write_script_original
 from .llm import AuthError, LLMError  # noqa: F401
 from .render import render
-from .crop import detect_photo
+from .crop import detect_photos
 from .paths import NO_WINDOW, PKG, home
 from . import voice
 
@@ -26,6 +28,8 @@ DEFAULT_SETTINGS = dict(
 )
 HISTORY_PATH = os.path.join(ROOT, "state", "compose_history.json")
 STABLE_SEC = 8      # file phải "yên" từng này giây (đã chép xong) mới xử lý
+GROUP_GAP = 20      # ảnh lẻ vào inbox cách nhau không quá ngần này giây = cùng một bài
+GROUP_WAIT = 25     # nhóm ảnh lẻ phải yên ngần này giây (chờ thả nốt ảnh) mới xử lý
 
 
 LOCAL_CFG = os.path.join(ROOT, "config.local.json")   # chỉnh riêng từng máy (không đưa lên git), đè lên config.json
@@ -84,17 +88,28 @@ def slug(s):
     return s[:40] or "job"
 
 
+def _natural(name):
+    """Sắp tên kiểu người đọc: Screenshot_2 đứng trước Screenshot_10."""
+    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", os.path.basename(name))]
+
+
 def _images_in(d):
-    return sorted(os.path.join(d, f) for f in os.listdir(d) if f.lower().endswith(IMG_EXT))
+    return sorted((os.path.join(d, f) for f in os.listdir(d) if f.lower().endswith(IMG_EXT)), key=_natural)
+
+
+def _arrived(p):
+    """Lúc file xuất hiện trong inbox. Trên Windows là thời điểm tạo file (chép/kéo thả vào), không phải lúc chụp."""
+    st = os.stat(p)
+    return max(getattr(st, "st_birthtime", 0) or st.st_ctime, st.st_mtime) if os.name == "nt" else st.st_mtime
 
 
 def list_jobs(inbox):
-    """Mỗi ảnh lẻ = 1 video. Mỗi thư mục con (chứa nhiều ảnh của cùng một bài) = 1 video.
-    Thư mục bắt đầu bằng "_" (_done, _failed) bị bỏ qua."""
-    jobs, now = [], time.time()
+    """Mỗi thư mục con = 1 bài. Ảnh lẻ được thả vào cùng một đợt (cách nhau <= GROUP_GAP giây) cũng gộp thành
+    1 bài, xếp theo tên (Screenshot_1, Screenshot_2...). Thư mục bắt đầu bằng "_" (_done, _failed) bị bỏ qua."""
+    jobs, now, loose = [], time.time(), []
     if not os.path.isdir(inbox):
         return jobs
-    for name in sorted(os.listdir(inbox)):
+    for name in sorted(os.listdir(inbox), key=_natural):
         if name.startswith(("_", ".")):
             continue
         p = os.path.join(inbox, name)
@@ -102,12 +117,27 @@ def list_jobs(inbox):
             imgs = _images_in(p)
             if not imgs:
                 continue
+            newest = max(os.path.getmtime(x) for x in imgs + [p])
+            jobs.append(dict(name=name, path=p, images=imgs, ready=now - newest >= STABLE_SEC,
+                             added=datetime.fromtimestamp(newest).isoformat(timespec="seconds")))
         elif name.lower().endswith(IMG_EXT):
-            imgs = [p]
+            try:
+                loose.append((_arrived(p), p))
+            except OSError:
+                continue
+    groups = []
+    for t, p in sorted(loose):
+        if groups and t - groups[-1][-1][0] <= GROUP_GAP:
+            groups[-1].append((t, p))
         else:
-            continue
-        newest = max(os.path.getmtime(x) for x in imgs + [p])
-        jobs.append(dict(name=name, path=p, images=imgs, ready=now - newest >= STABLE_SEC,
+            groups.append([(t, p)])
+    for g in groups:
+        imgs = sorted((p for _, p in g), key=_natural)
+        newest = max(t for t, _ in g)
+        first = os.path.basename(imgs[0])
+        name = first if len(imgs) == 1 else f"{os.path.splitext(first)[0]} (+{len(imgs) - 1} ảnh)"
+        jobs.append(dict(name=name, path=imgs[0], files=imgs, images=imgs,
+                         ready=now - newest >= (STABLE_SEC if len(imgs) > 1 or now - newest > GROUP_WAIT else GROUP_WAIT),
                          added=datetime.fromtimestamp(newest).isoformat(timespec="seconds")))
     return jobs
 
@@ -138,7 +168,8 @@ def mark(job, inbox, sub, info):
         shutil.move(job["path"], dest)
     else:
         os.makedirs(dest, exist_ok=True)
-        shutil.move(job["path"], os.path.join(dest, job["name"]))
+        for f in job.get("files") or [job["path"]]:
+            shutil.move(f, os.path.join(dest, os.path.basename(f)))
     json.dump(dict(info, at=datetime.now().isoformat(timespec="seconds"), original=job["name"]),
               open(os.path.join(dest, "_info.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return dest
@@ -184,13 +215,19 @@ def tts(script, cfg, out_dir):
 def make_video(script, cfg, settings, name, log=print):
     out_dir = os.path.join(settings["output_dir"], datetime.now().strftime("%Y-%m-%d_%H%M%S") + "_" + slug(name))
     os.makedirs(out_dir, exist_ok=True)
-    img = script.get("post", {}).get("image")
-    if img and os.path.exists(img) and os.path.dirname(os.path.abspath(img)) != out_dir:
-        dst = os.path.join(out_dir, "post_image.png")
-        shutil.copyfile(img, dst)
-        if os.path.basename(img).startswith("_photo_"):
-            os.remove(img)
-        script["post"]["image"] = dst
+    items = [("post_image.png", script.get("post", {}))]
+    items += [(f"comment_{k + 1:02d}_image.png", c) for k, c in enumerate(script.get("comments", []))]
+    for fname, item in items:   # chép hình vào thư mục video để video tự đủ, xoá file tạm
+        img = item.get("image")
+        if not isinstance(img, str) or not os.path.exists(img):
+            item.pop("image", None)
+            continue
+        if os.path.dirname(os.path.abspath(img)) != out_dir:
+            dst = os.path.join(out_dir, fname)
+            shutil.copyfile(img, dst)
+            if os.path.basename(img).startswith("_photo_"):
+                os.remove(img)
+            item["image"] = dst
     json.dump(script, open(os.path.join(out_dir, "script.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     log(f"VieNeu đọc {len(script['comments']) + 1} câu...")
     timing = tts(script, cfg, out_dir)
@@ -209,6 +246,46 @@ def make_video(script, cfg, settings, name, log=print):
     return out_dir, meta
 
 
+def _cut(job, ref, tag, cache):
+    """Cắt hình theo {"index": ảnh chụp thứ mấy, "nth": hình thứ mấy trong ảnh đó (từ trên xuống)} -> đường dẫn PNG."""
+    if not isinstance(ref, dict) or not isinstance(ref.get("index"), int) or not 0 <= ref["index"] < len(job["images"]):
+        return None
+    i = ref["index"]
+    if i not in cache:
+        cache[i] = detect_photos(job["images"][i])
+    photos = cache[i]
+    if not photos:
+        return None
+    nth = ref.get("nth") if isinstance(ref.get("nth"), int) else 0
+    photo = photos[min(max(nth, 0), len(photos) - 1)]
+    tmp = os.path.join(ROOT, "state", f"_photo_{slug(job['name'])}_{tag}.png")
+    os.makedirs(os.path.dirname(tmp), exist_ok=True)
+    photo.save(tmp)
+    return tmp
+
+
+def attach_photos(script, job, log=print):
+    """Gắn hình/meme thật vào bài gốc và vào những bình luận AI đánh dấu là có hình."""
+    cache = {}
+    targets = [("post", script.get("post_image"), script.get("post"))]
+    targets += [(f"c{k}", c.get("image"), c) for k, c in enumerate(script.get("comments", []))]
+    for tag, ref, item in targets:
+        if item is None:
+            continue
+        item.pop("image", None)
+        if not ref:
+            continue
+        try:
+            path = _cut(job, ref, tag, cache)
+        except Exception as e:  # noqa: BLE001
+            log(f"  ! không cắt được hình ({tag}): {e}")
+            continue
+        if path:
+            item["image"] = path
+            w, h = Image.open(path).size
+            log(f"  cắt được hình {'của bài' if tag == 'post' else 'của bình luận ' + tag[1:]} {w}x{h}")
+
+
 def process_job(job, cfg, settings, log=print):
     """Đọc ảnh -> kịch bản -> video. Xong thì đánh dấu đã đọc. Lỗi đăng nhập Claude thì để nguyên trong inbox."""
     inbox = settings["inbox_dir"]
@@ -221,18 +298,7 @@ def process_job(job, cfg, settings, log=print):
         log(f"✖ {job['name']}: {e}")
         mark(job, inbox, "_failed", dict(error=str(e)))
         return None
-    pi = script.get("post_image")
-    if isinstance(pi, dict) and isinstance(pi.get("index"), int) and 0 <= pi["index"] < len(job["images"]):
-        try:
-            photo = detect_photo(job["images"][pi["index"]])
-            if photo is not None:
-                tmp = os.path.join(ROOT, "state", f"_photo_{slug(job['name'])}.png")
-                os.makedirs(os.path.dirname(tmp), exist_ok=True)
-                photo.save(tmp)
-                script["post"]["image"] = tmp
-                log(f"  cắt được hình của bài {photo.size[0]}x{photo.size[1]}")
-        except Exception as e:  # noqa
-            log(f"  ! không cắt được hình: {e}")
+    attach_photos(script, job, log)
     if script.get("skip"):
         reason = script.get("reason", "")
         log(f"⤼ {job['name']}: Claude bỏ qua ({reason})")

@@ -21,11 +21,11 @@ Dữ liệu của bạn nằm ở `%LOCALAPPDATA%\CommentKit`: key (`.env`), `co
 
 ## Cách dùng
 
-**Từ ảnh chụp:** lướt Threads, chụp màn hình bài hay cùng các bình luận, rồi thả ảnh vào app (kéo thả, bấm chọn, hoặc dán bằng Ctrl+V). Chọn "các ảnh cùng 1 bài → 1 video" hoặc "mỗi ảnh 1 video". Cũng có thể chép thẳng ảnh vào thư mục inbox: một ảnh lẻ là một video, một thư mục con là một bài.
+**Từ ảnh chụp:** lướt Threads, chụp màn hình bài hay cùng các bình luận, rồi thả ảnh vào app (kéo thả, bấm chọn, hoặc dán bằng Ctrl+V). Chọn "các ảnh cùng 1 bài → 1 video" hoặc "mỗi ảnh 1 video". Cũng có thể chép thẳng ảnh vào thư mục inbox: các ảnh chép vào cùng một lượt (cách nhau dưới 20 giây) là một bài, xếp theo tên; một thư mục con cũng là một bài. AI tự nhận ra ảnh nào là bài gốc, ảnh nào là bình luận.
 
 Khi bật **Tự động**, CommentKit quét inbox 30 giây một lần. Với mỗi bài, tool làm các bước sau:
-1. AI đọc ảnh: viết lại bài bằng lời của nó, thay mọi tên người dùng bằng tên che bịa ngẫu nhiên, viết lại các bình luận hay, thêm bình luận của riêng nó, gán mỗi câu cho một nhân vật, đặt tiêu đề, mô tả và tag. Bài nhạy cảm thì bỏ qua.
-2. Nếu bài có hình hoặc meme, tool tự cắt hình đó ra khỏi ảnh chụp.
+1. AI đọc ảnh: viết lại bài bằng lời của nó, thay mọi tên người dùng bằng tên che bịa ngẫu nhiên, viết lại các bình luận hay, thêm bình luận của riêng nó, gán mỗi câu cho một nhân vật, đặt tiêu đề, mô tả và tag. Khoảng một nửa số câu viết kiểu Gen Z (teencode, viết tắt), giọng đọc vẫn đọc câu đầy đủ. Bài nhạy cảm thì bỏ qua.
+2. Nếu bài gốc hoặc bình luận có hình/meme, tool tự cắt hình đó ra khỏi ảnh chụp và gắn vào đúng thẻ.
 3. VieNeu-TTS đọc từng câu bằng giọng của nhân vật đó.
 4. Dựng video 1080×1920: gameplay phủ kín màn hình, mỗi lúc một thẻ, đổi thẻ đúng lúc giọng đọc tới câu đó.
 5. Ảnh đã đọc chuyển sang `inbox/_done`, nên không bị đọc lại. Ảnh lỗi chuyển sang `inbox/_failed`, bấm **Thử lại** để chạy lại.
@@ -63,7 +63,7 @@ Ghi phần chỉnh riêng vào `config.local.json` trong thư mục dữ liệu.
 
 Ví dụ:
 ```json
-{ "channel_handle": "kenhcuatoi", "tts": { "speed": 1.1 } }
+{ "channel_handle": "Zapp-moments", "tts": { "speed": 1.1 } }
 ```
 
 ## Trước khi đăng

@@ -78,6 +78,12 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
 .modal .card{width:min(620px,100%);max-height:86vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
 .modal h2{margin:0 0 10px;font-size:18px}
 .notes{white-space:pre-wrap;color:#d6d9e0;font-size:14px;line-height:1.55}
+.modal .card.ask{width:min(460px,100%)}
+.ask p{color:var(--mut);margin:0 0 6px;line-height:1.5}
+.ask .what{color:var(--text);font-weight:600;margin:0 0 10px;word-break:break-word}
+.ask .row{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+button.danger{background:var(--err);border-color:var(--err);color:#1a0b0b;font-weight:600}
+button.danger:hover{filter:brightness(1.08)}
 </style>
 </head>
 <body>
@@ -112,7 +118,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
         <label><input type="radio" name="mode" value="group" checked> Các ảnh cùng 1 bài → 1 video</label>
         <label><input type="radio" name="mode" value="each"> Mỗi ảnh 1 video</label>
       </div>
-      <p class="empty" style="margin:10px 0 0">Bạn cũng có thể chép thẳng ảnh vào thư mục inbox. Một thư mục con là một bài.</p>
+      <p class="empty" style="margin:10px 0 0">Bạn cũng có thể chép thẳng ảnh vào thư mục inbox: các ảnh chép vào cùng lúc là một bài (xếp theo tên, AI tự nhận ra ảnh nào là bài gốc); một thư mục con cũng là một bài.</p>
     </div>
 
     <div class="box">
@@ -193,6 +199,8 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
 <div class="toast" id="toast"></div>
 <div class="modal" id="notes" hidden><div class="card"><h2 id="notesTitle">Có gì mới</h2><div class="notes" id="notesBody"></div>
   <div style="display:flex;margin-top:16px"><span class="spacer"></span><button class="pri" id="notesOk">OK</button></div></div></div>
+<div class="modal" id="ask" hidden><div class="card ask"><h2 id="askTitle"></h2><div class="what" id="askWhat"></div><p id="askText"></p>
+  <div class="row"><button id="askNo">Huỷ</button><button class="danger" id="askYes">Xoá</button></div></div></div>
 <div class="modal" id="gone" hidden><div class="card" style="text-align:center"><img src="/icon-192.png" alt="" width="64" height="64">
   <h2 id="goneTitle" style="margin-top:12px"></h2><p class="empty" id="goneText"></p>
   <button class="pri" id="goneClose">Đóng cửa sổ này</button></div></div>
@@ -201,6 +209,19 @@ details summary{cursor:pointer;color:var(--mut);font-size:13px}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const post = (u, b) => fetch(u, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(b||{})}).then(r => r.json()).catch(() => ({ok:false, msg:"Không gửi được yêu cầu"}));
+// hộp xác nhận trong app (thay cho hộp hỏi mặc định của trình duyệt): trả về Promise<true|false>
+function ask(title, what, text, yes = "Xoá"){
+  return new Promise(done => {
+    const box = $("#ask");
+    $("#askTitle").textContent = title; $("#askWhat").textContent = what || ""; $("#askText").textContent = text || "";
+    $("#askYes").textContent = yes; box.hidden = false; $("#askNo").focus();
+    const close = v => { box.hidden = true; box.onclick = $("#askYes").onclick = $("#askNo").onclick = document.onkeydown = null; done(v); };
+    $("#askYes").onclick = () => close(true);
+    $("#askNo").onclick = () => close(false);
+    box.onclick = e => { if (e.target === box) close(false); };
+    document.onkeydown = e => { if (e.key === "Escape") close(false); };
+  });
+}
 function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("on"),2200); }
 let shownOutputs = "", settingsFilled = false, FAILS = 0, GONE = false, UPDATING = false, UPD = null, WN_SHOWN = false;
 
@@ -342,12 +363,13 @@ document.body.addEventListener("click", async e => {
   const t = e.target;
   if (t.dataset.chk){ t.textContent = "Đang kiểm tra…"; const r = await post("/api/check-llm", {provider:t.dataset.chk}); t.textContent = "Kiểm tra " + ({openai:"OpenAI", gemini:"Gemini", claude:"Claude"})[t.dataset.chk]; toast(r.ok ? "OK" : r.msg); refresh(); }
   else if (t.dataset.retry){ await post("/api/retry", {name:t.dataset.retry}); toast("Đưa lại vào hàng chờ"); refresh(); }
-  else if (t.dataset.bgdel){ if (confirm("Xoá video nền " + t.dataset.bgdel + "?")) { await post("/api/bg/delete", {name:t.dataset.bgdel}); refresh(); } }
+  else if (t.dataset.bgdel){
+    if (await ask("Xoá video nền này?", t.dataset.bgdel, "File sẽ bị xoá khỏi thư mục video nền.")) { await post("/api/bg/delete", {name:t.dataset.bgdel}); refresh(); }
+  }
   else if (t.dataset.copy !== undefined){ await navigator.clipboard.writeText(t.dataset.copy); toast("Đã chép"); }
   else if (t.dataset.delout){
     const card = t.closest(".vid"), title = card.querySelector(".tt").textContent;
-    if (!confirm(`Xoá video "${title}"?
-Cả thư mục của video (video, thumbnail, kịch bản) sẽ vào Thùng rác, khôi phục lại được.`)) return;
+    if (!await ask("Xoá video này?", title, "Cả thư mục của video (video, thumbnail, kịch bản) sẽ vào Thùng rác của Windows, khôi phục lại được.")) return;
     const v = card.querySelector("video"); v.pause(); v.removeAttribute("src"); v.load();   // nhả file để Windows xoá được
     const r = await post("/api/output/delete", {name:t.dataset.delout});
     if (r.ok) { card.remove(); toast("Đã chuyển video vào Thùng rác"); }

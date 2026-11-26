@@ -218,14 +218,17 @@ def upload():
     if not files:
         return jsonify(ok=False, msg="Không có ảnh hợp lệ (png/jpg/webp)"), 400
     inbox, stamp = W.settings["inbox_dir"], datetime.now().strftime("%Y%m%d-%H%M%S")
+    files.sort(key=lambda f: P._natural(f.filename))   # giữ thứ tự tên gốc: Screenshot_1, Screenshot_2...
     if request.form.get("mode", "group") == "group" and len(files) > 1:
         d = os.path.join(inbox, f"{stamp}-post")
         os.makedirs(d, exist_ok=True)
         for i, f in enumerate(files, 1):
             f.save(os.path.join(d, f"{i:02d}{os.path.splitext(f.filename)[1].lower()}"))
-    else:
+    else:   # mỗi ảnh một thư mục: ảnh lẻ thả vào cùng lúc sẽ bị gộp thành một bài
         for i, f in enumerate(files, 1):
-            f.save(os.path.join(inbox, f"{stamp}-{i:02d}{os.path.splitext(f.filename)[1].lower()}"))
+            d = os.path.join(inbox, f"{stamp}-{i:02d}")
+            os.makedirs(d, exist_ok=True)
+            f.save(os.path.join(d, f"01{os.path.splitext(f.filename)[1].lower()}"))
     W.log(f"Đã nhận {len(files)} ảnh")
     return jsonify(ok=True, n=len(files))
 

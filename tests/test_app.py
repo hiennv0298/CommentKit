@@ -52,6 +52,7 @@ def test_settings_rejects_a_python_without_vieneu(client):
 def test_ui_is_vietnamese():
     html = (WEBUI / "index.html").read_text(encoding="utf-8")
     assert '<html lang="vi">' in html and "Cài giọng đọc" in html and "Kéo thả ảnh vào đây" in html
+    assert "confirm(" not in html and "alert(" not in html   # dùng hộp thoại trong app, không dùng hộp của trình duyệt
 
 
 def test_icon_sizes():

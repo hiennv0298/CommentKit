@@ -3,6 +3,16 @@
 Mục của mỗi phiên bản là ghi chú phát hành trên trang GitHub Releases.
 Thêm mục `## <phiên bản>` ở đây trước khi đẩy tag `v<phiên bản>`.
 
+## 0.1.3
+
+- **Ảnh chụp thả vào cùng lúc là một bài.** Chép hoặc kéo nhiều ảnh vào thư mục inbox một lượt (cách nhau dưới 20 giây) thì tool gộp thành một video, xếp theo tên (Screenshot_1, Screenshot_2, Screenshot_10...). Trước đây mỗi ảnh lẻ thành một video riêng.
+- **AI tự nhận ra ảnh nào là bài gốc**, ảnh nào là bình luận. Nếu các ảnh là những bài khác nhau, AI chọn bài hài nhất.
+- **Hình trong bình luận** (meme, ảnh mèo...) giờ được cắt ra và hiện trong thẻ bình luận, như hình của bài gốc. Một ảnh chụp có nhiều hình thì tool cắt được từng hình.
+- **Khoảng một nửa số câu viết kiểu Gen Z**: teencode, viết tắt ("k bt j", "nma", "cx", "r"...). Nửa còn lại viết đúng chính tả, nhất là nhân vật lớn tuổi. Giọng đọc vẫn đọc câu đầy đủ, đúng chính tả. Không dùng từ tục.
+- Handle in dưới thẻ đổi thành **@Zapp-moments**.
+- Xoá video và xoá video nền giờ hỏi lại bằng hộp thoại của app thay cho hộp hỏi mặc định của trình duyệt.
+- Trên giao diện, chế độ "Mỗi ảnh 1 video" lưu mỗi ảnh vào một thư mục riêng nên không bị gộp. Các ảnh thả cùng lúc giữ đúng thứ tự theo tên.
+
 ## 0.1.2
 
 - **Nút Xoá video** trên mỗi video đã làm: cả thư mục của video (video, thumbnail, kịch bản) vào Thùng rác của Windows, khôi phục lại được.
