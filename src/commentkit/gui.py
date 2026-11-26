@@ -510,7 +510,7 @@ def main(open_ui=True):
     add_bundled_tools()
     existing = _running_instance()
     if existing:
-        if open_ui:
+        if open_ui and not os.environ.get("COMMENTKIT_NO_WINDOW"):
             open_window(existing)
         return 0
     relaunch = _take_relaunch()
