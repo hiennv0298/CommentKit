@@ -3,6 +3,14 @@
 Mục của mỗi phiên bản là ghi chú phát hành trên trang GitHub Releases.
 Thêm mục `## <phiên bản>` ở đây trước khi đẩy tag `v<phiên bản>`.
 
+## 0.1.5
+
+- **Tự đăng lên YouTube.** Nạp file OAuth client của Google Cloud (hướng dẫn trong README, làm một lần), bấm **Kết nối YouTube**, rồi:
+  - bật **Tự đăng video mới làm xong**, hoặc bấm **Đăng YouTube** trên từng video;
+  - chọn chế độ hiển thị: Riêng tư, Không công khai, Công khai, hoặc **Hẹn giờ theo khung giờ** (ví dụ `11:30, 20:00`: mỗi video lấy khung trống gần nhất).
+- Video đăng lên có sẵn tiêu đề, mô tả, hashtag, tag, thể loại Hài, ngôn ngữ tiếng Việt, "Không dành cho trẻ em" và mục công bố nội dung tổng hợp (giọng AI). Mỗi video trong app có link tới bản đã đăng.
+- Lưu ý của Google: project chưa qua kiểm duyệt YouTube API thì video tải lên bị khoá ở chế độ riêng tư; hạn mức khoảng 6 video/ngày.
+
 ## 0.1.4
 
 - **Tự tìm giọng đọc đã cài.** Khi chưa có giọng đọc dùng được, app tự tìm VieNeu có sẵn trên máy (bản CommentKit đã cài, Python trên máy, các venv như `F:\ZAPP\F_VideoStudio\.venv`) cùng thư mục model đã tải, rồi dùng luôn, không bắt cài lại. Thanh báo có thêm nút **Tìm bản đã cài**.

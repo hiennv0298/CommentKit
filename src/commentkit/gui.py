@@ -17,11 +17,12 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 
+import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 from werkzeug.serving import make_server
 from werkzeug.utils import secure_filename
 
-from . import __version__, pipeline as P, updates, voice
+from . import __version__, pipeline as P, updates, voice, youtube
 from .llm import has_gemini_key, has_openai_key, set_env
 from .paths import PKG, add_bundled_tools, home
 from .render import VIDEO_EXT
@@ -53,6 +54,8 @@ class Worker(threading.Thread):
         self.next_scan = 0
         self.voice_job = None   # None | "running" | "done" | "error: ..."
         self.voice_req = False
+        self.upload_req = []    # tên thư mục video chờ đăng YouTube
+        self.yt_progress = None  # {"name", "pct"} khi đang tải lên
 
     def log(self, *a):
         line = datetime.now().strftime("%H:%M:%S ") + " ".join(str(x) for x in a)
@@ -61,7 +64,7 @@ class Worker(threading.Thread):
 
     @property
     def busy(self):
-        return bool(self.current or self.compose_req or self.voice_req or self.voice_job == "running"
+        return bool(self.current or self.compose_req or self.voice_req or self.voice_job == "running" or self.upload_req
                     or updates.PROGRESS["phase"] in ("downloading", "verifying"))
 
     def find_voice(self, quiet=False):
@@ -91,6 +94,9 @@ class Worker(threading.Thread):
                 self.voice_req = False
                 self.install_voice()
                 continue
+            if self.upload_req:
+                self.upload_video(self.upload_req.pop(0))
+                continue
             due = self.settings["auto"] and time.time() >= self.next_scan
             if self.compose_req:
                 self.compose(self.compose_req.pop(0) or None)
@@ -100,6 +106,42 @@ class Worker(threading.Thread):
                 self.scan()
                 self.next_scan = time.time() + max(5, int(self.settings["interval_sec"]))
             time.sleep(1)
+
+    def auto_upload(self, out_dir):
+        """Video vừa làm xong: tự đăng nếu đã bật và đã kết nối kênh."""
+        if out_dir and self.settings.get("yt_auto") and youtube.status()["connected"]:
+            self.upload_req.append(os.path.basename(out_dir))
+
+    def upload_video(self, name):
+        out_dir = os.path.join(self.settings["output_dir"], os.path.basename(name))
+        meta = P.load_meta(out_dir)
+        if not os.path.isfile(os.path.join(out_dir, "video.mp4")) or (meta.get("youtube") or {}).get("id"):
+            return
+        privacy = self.settings.get("yt_privacy", "private")
+        publish_at = None
+        if privacy == "schedule":
+            publish_at = youtube.next_slot(youtube.parse_slots(self.settings.get("yt_slots")),
+                                           P.scheduled_times(self.settings["output_dir"]))
+            if not publish_at:
+                privacy = "private"
+        self.current = "đăng YouTube: " + (meta.get("title") or name)
+        self.yt_progress = {"name": name, "pct": 0}
+        self.log("⇪ Đăng YouTube:", meta.get("title") or name, f"({privacy}{', ' + publish_at if publish_at else ''})")
+        try:
+            res = youtube.upload(os.path.join(out_dir, "video.mp4"), meta, privacy, publish_at,
+                                 on_progress=lambda pct: self.yt_progress.update(pct=pct))
+            P.update_meta(out_dir, youtube=dict(res, privacy=privacy, publish_at=publish_at,
+                                                uploaded=datetime.now().isoformat(timespec="seconds")), youtube_error=None)
+            self.log("✔ Đã đăng YouTube:", res["url"])
+        except youtube.QuotaError as e:
+            P.update_meta(out_dir, youtube_error=str(e))
+            self.log("⏸", e)
+            self.upload_req.clear()
+        except Exception as e:  # noqa: BLE001
+            P.update_meta(out_dir, youtube_error=str(e))
+            self.log("✖ Đăng YouTube lỗi:", e)
+        finally:
+            self.current, self.yt_progress = None, None
 
     def install_voice(self):
         self.voice_job, self.current = "running", "cài giọng đọc"
@@ -116,7 +158,7 @@ class Worker(threading.Thread):
     def compose(self, topic=None):
         self.current = "sáng tác" + (f": {topic}" if topic else "")
         try:
-            P.compose_one(P.load_cfg(), self.settings, self.log, topic)
+            self.auto_upload(P.compose_one(P.load_cfg(), self.settings, self.log, topic))
             self.error = None
         except P.AuthError as e:
             self.error = str(e)
@@ -134,7 +176,7 @@ class Worker(threading.Thread):
         for j in jobs:
             self.current = j["name"]
             try:
-                P.process_job(j, P.load_cfg(), self.settings, self.log)
+                self.auto_upload(P.process_job(j, P.load_cfg(), self.settings, self.log))
                 self.error = None
             except P.AuthError as e:
                 self.error = str(e)
@@ -229,6 +271,7 @@ def state():
         openai_key=has_openai_key(), openai_model=cfg.get("openai", {}).get("model", ""),
         gemini_key=has_gemini_key(), gemini_model=cfg.get("gemini", {}).get("model", ""),
         voice=dict(voice_status(cfg), job=W.voice_job), ffmpeg=bool(shutil.which("ffmpeg")),
+        youtube=dict(youtube.status(), progress=W.yt_progress, queue=list(W.upload_req)),
         composed_today=P.composed_today(), compose_queue=len(W.compose_req),
         topics=cfg.get("compose", {}).get("topics", []), logs=list(W.logs)[-120:],
         next_scan=max(0, int(W.next_scan - time.time())) if s["auto"] else None,
@@ -300,6 +343,13 @@ def set_settings():
         patch["tts"] = {"python": py.replace("\\", "/")}
     if patch:
         P.save_local_cfg(patch)
+    if "yt_auto" in body:
+        W.settings["yt_auto"] = bool(body["yt_auto"])
+    if body.get("yt_privacy") in ("private", "unlisted", "public", "schedule"):
+        W.settings["yt_privacy"] = body["yt_privacy"]
+    if "yt_slots" in body:
+        slots = youtube.parse_slots(body["yt_slots"])
+        W.settings["yt_slots"] = ", ".join(f"{h:02d}:{m:02d}" for h, m in slots) or "11:30, 20:00"
     if "check_updates" in body:
         W.settings["check_updates"] = bool(body["check_updates"])
     if "interval_sec" in body:
@@ -339,13 +389,78 @@ def update_install():
     return jsonify(ok=True)
 
 
+LINK_PREFIXES = (f"https://github.com/{updates.REPO}/", "https://youtube.com/", "https://www.youtube.com/",
+                 "https://studio.youtube.com/", "https://console.cloud.google.com/", youtube.AUDIT_FORM)
+
+
 @app.post("/api/link")
 def open_link():
     url = str((request.json or {}).get("url", ""))
-    if not url.startswith(f"https://github.com/{updates.REPO}/"):   # chỉ mở trang release của CommentKit
+    if not url.startswith(LINK_PREFIXES):   # chỉ mở những trang CommentKit cần (release, YouTube, Google Cloud)
         abort(400)
     webbrowser.open(url)
     return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------- YouTube
+
+@app.post("/api/youtube/client")
+def yt_client():
+    f = request.files.get("file")
+    if not f:
+        return jsonify(ok=False, msg="Chưa chọn file"), 400
+    try:
+        youtube.save_client(f.read())
+    except youtube.YouTubeError as e:
+        return jsonify(ok=False, msg=str(e)), 400
+    return jsonify(ok=True)
+
+
+@app.post("/api/youtube/connect")
+def yt_connect():
+    port = (request.host or "").rsplit(":", 1)[-1]
+    try:
+        url = youtube.auth_url(f"http://127.0.0.1:{port}/oauth/youtube")
+    except youtube.YouTubeError as e:
+        return jsonify(ok=False, msg=str(e)), 400
+    webbrowser.open(url)   # trình duyệt mặc định, nơi bạn đang đăng nhập Google
+    return jsonify(ok=True, url=url)
+
+
+@app.get("/oauth/youtube")
+def yt_callback():
+    page = ('<!doctype html><meta charset="utf-8"><title>CommentKit</title>'
+            '<body style="font:16px Segoe UI,sans-serif;background:#0e0f12;color:#eef0f4;display:grid;place-items:center;height:90vh">'
+            '<div style="text-align:center"><h2>{}</h2><p>{}</p></div>')
+    if request.args.get("error"):
+        return page.format("Chưa kết nối YouTube", "Google báo: " + request.args["error"] + ". Đóng tab này và thử lại.")
+    try:
+        ch = youtube.finish_auth(request.args.get("code", ""), request.args.get("state", ""))
+    except (youtube.YouTubeError, requests.RequestException) as e:
+        return page.format("Chưa kết nối YouTube", str(e).replace("<", "&lt;"))
+    W.log("✔ Đã kết nối kênh YouTube:", ch["title"])
+    return page.format("Đã kết nối kênh " + ch["title"].replace("<", "&lt;"), "Đóng tab này và quay lại CommentKit.")
+
+
+@app.post("/api/youtube/disconnect")
+def yt_disconnect():
+    youtube.disconnect()
+    W.settings["yt_auto"] = False
+    P.save_settings(W.settings)
+    W.log("Đã ngắt kết nối YouTube")
+    return jsonify(ok=True)
+
+
+@app.post("/api/youtube/upload")
+def yt_upload():
+    name = os.path.basename((request.json or {}).get("name", ""))
+    if not name or not os.path.isfile(os.path.join(W.settings["output_dir"], name, "video.mp4")):
+        abort(404)
+    if not youtube.status()["connected"]:
+        return jsonify(ok=False, msg="Chưa kết nối YouTube (Cài đặt > YouTube)."), 400
+    if name not in W.upload_req:
+        W.upload_req.append(name)
+    return jsonify(ok=True, queued=len(W.upload_req))
 
 
 @app.post("/api/voice/detect")

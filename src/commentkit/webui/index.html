@@ -25,6 +25,11 @@ button:hover{border-color:#444857}
 button.pri{background:var(--acc);color:#111;border-color:var(--acc);font-weight:600}
 button.sm{padding:4px 9px;font-size:12px}
 button.del{color:var(--err)}
+.yts{font-size:12px;color:var(--mut);margin-top:2px}
+.yts a{color:#ff6b6b;text-decoration:none;font-weight:600}
+.yts .err{color:var(--err)}
+#ytBox a{color:var(--blue)}
+.yt-ch{display:flex;align-items:center;gap:8px;margin:2px 0 10px;flex-wrap:wrap}
 button.del:hover{border-color:var(--err)}
 .sw{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
 .sw input{display:none}
@@ -151,6 +156,29 @@ button.danger:hover{filter:brightness(1.08)}
       <p class="empty" style="margin:8px 0 0">Mỗi video lấy ngẫu nhiên một file, bắt đầu từ một đoạn ngẫu nhiên. Nên dùng gameplay tự quay hoặc video được dùng tự do.</p>
     </div>
 
+    <div class="box" id="ytBox">
+      <h2>YouTube <span class="n" id="ytState"></span></h2>
+      <div id="ytSetup">
+        <p class="empty" style="margin:0 0 8px">Để tool tự đăng video, cần một OAuth client của Google Cloud (miễn phí, làm một lần, khoảng 5 phút).
+          Xem <a href="#" data-link="https://github.com/hiennv0298/CommentKit#đăng-lên-youtube">hướng dẫn</a>.</p>
+        <button class="sm" id="ytClientBtn">Nạp file client_secret.json</button><input type="file" id="ytClient" accept=".json,application/json" hidden>
+      </div>
+      <div id="ytConnect" style="display:none">
+        <button class="pri sm" id="ytConnectBtn">Kết nối YouTube</button>
+        <span class="empty">Trình duyệt sẽ mở trang đăng nhập Google.</span>
+        <div style="margin-top:6px"><button class="sm" id="ytClientBtn2">Nạp lại client_secret.json</button></div>
+      </div>
+      <div id="ytOn" style="display:none">
+        <div class="yt-ch">Kênh: <b id="ytChannel"></b><span class="spacer"></span><button class="sm" id="ytOff">Ngắt kết nối</button></div>
+        <label class="sw"><input type="checkbox" id="ytAuto"><i></i>Tự đăng video mới làm xong</label>
+        <label class="f">Chế độ hiển thị khi đăng</label>
+        <select class="t" id="ytPrivacy"><option value="private">Riêng tư</option><option value="unlisted">Không công khai</option><option value="public">Công khai</option><option value="schedule">Hẹn giờ theo khung giờ</option></select>
+        <div id="ytSlotsRow"><label class="f">Khung giờ đăng mỗi ngày (cách nhau dấu phẩy)</label><input class="t" id="ytSlots" placeholder="11:30, 20:00"></div>
+        <p class="empty" style="margin:8px 0 0">Dự án Google chưa qua <a href="#" id="ytAudit">kiểm duyệt API</a> thì video tải lên bị khoá ở chế độ riêng tư.
+          Hạn mức của Google: khoảng 6 video/ngày.</p>
+      </div>
+    </div>
+
     <div class="box">
       <details>
         <summary>Đã đọc gần đây <span id="nDone"></span></summary>
@@ -221,6 +249,37 @@ function ask(title, what, text, yes = "Xoá"){
     box.onclick = e => { if (e.target === box) close(false); };
     document.onkeydown = e => { if (e.key === "Escape") close(false); };
   });
+}
+function ytCell(o, y){
+  const p = y.progress;
+  if (p && p.name === o.name) return `Đang tải lên YouTube… ${p.pct}%`;
+  if (o.youtube && o.youtube.id) {
+    const when = o.youtube.publish_at ? " · hẹn đăng " + new Date(o.youtube.publish_at).toLocaleString("vi-VN", {hour:"2-digit", minute:"2-digit", day:"2-digit", month:"2-digit"}) : "";
+    const pv = {private:" (riêng tư)", unlisted:" (không công khai)", public:"", schedule:""}[o.youtube.privacy] || "";
+    return `<a href="#" data-link="${esc(o.youtube.url)}">▶ Đã đăng YouTube</a>${pv}${when}`;
+  }
+  if ((y.queue || []).includes(o.name)) return "Chờ đăng YouTube…";
+  if (!y.connected) return "";
+  return `<button class="sm" data-ytup="${esc(o.name)}">Đăng YouTube</button>` + (o.youtube_error ? ` <span class="err" title="${esc(o.youtube_error)}">lỗi lần trước</span>` : "");
+}
+function renderYouTube(s){
+  const y = s.youtube;
+  $("#ytSetup").style.display = y.client ? "none" : "";
+  $("#ytConnect").style.display = y.client && !y.connected ? "" : "none";
+  $("#ytOn").style.display = y.connected ? "" : "none";
+  $("#ytState").textContent = y.connected ? "đã kết nối" : y.client ? "chưa kết nối" : "chưa thiết lập";
+  $("#ytChannel").textContent = y.channel ? y.channel.title : "";
+  $("#ytAudit").dataset.link = y.audit_form;
+  $("#ytAuto").checked = !!s.settings.yt_auto;
+  if (document.activeElement !== $("#ytPrivacy")) $("#ytPrivacy").value = s.settings.yt_privacy || "private";
+  if (document.activeElement !== $("#ytSlots")) $("#ytSlots").value = s.settings.yt_slots || "";
+  $("#ytSlotsRow").style.display = s.settings.yt_privacy === "schedule" ? "" : "none";
+  for (const o of s.outputs) {
+    const el = document.querySelector(`[data-yt="${CSS.escape(o.name)}"]`);
+    if (!el) continue;
+    const html = ytCell(o, y);
+    if (el._h !== html) { el.innerHTML = html; el._h = html; }
+  }
 }
 function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("on"),2200); }
 let shownOutputs = "", settingsFilled = false, FAILS = 0, GONE = false, UPDATING = false, UPD = null, WN_SHOWN = false;
@@ -301,8 +360,9 @@ async function refresh(){
         <button class="sm" data-copy="${esc((o.description||"") + "\n\n" + (o.tags||[]).map(t=>"#"+t.replace(/\s+/g,"")).join(" "))}">Chép mô tả</button>
         <button class="sm" data-openout="${esc(o.name)}">Thư mục</button>
         <button class="sm del" data-delout="${esc(o.name)}" title="Chuyển video vào Thùng rác">Xoá</button>
-      </div></div></div>`).join("") : `<div class="empty">Chưa có video nào.</div>`;
+      </div><div class="yts" data-yt="${esc(o.name)}"></div></div></div>`).join("") : `<div class="empty">Chưa có video nào.</div>`;
   }
+  renderYouTube(s);
 
   const lg = $("#log"), atBottom = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 20;
   lg.textContent = s.logs.join("\n");
@@ -376,12 +436,33 @@ document.body.addEventListener("click", async e => {
     else toast(r.msg || "Không xoá được");
     shownOutputs = ""; refresh();
   }
+  else if (t.dataset.link){ e.preventDefault(); post("/api/link", {url:t.dataset.link}); }
+  else if (t.dataset.ytup){ t.disabled = true; const r = await post("/api/youtube/upload", {name:t.dataset.ytup}); toast(r.ok ? "Đã xếp lượt đăng YouTube" : (r.msg || "Không đăng được")); refresh(); }
   else if (t.dataset.openout){ post("/api/open", {kind:"output", name:t.dataset.openout}); }
   else if (t.dataset.open){ post("/api/open", {kind:t.dataset.open}); }
   else if (t.matches(".thumbs img")){ const lb=$("#lightbox"); lb.querySelector("img").src=t.src; lb.style.display="flex"; }
 });
 $("#lightbox").onclick = () => $("#lightbox").style.display = "none";
 
+const ytPickClient = () => $("#ytClient").click();
+$("#ytClientBtn").onclick = ytPickClient; $("#ytClientBtn2").onclick = ytPickClient;
+$("#ytClient").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const fd = new FormData(); fd.append("file", f);
+  const r = await fetch("/api/youtube/client", {method:"POST", body:fd}).then(r => r.json()).catch(() => ({ok:false}));
+  toast(r.ok ? "Đã nạp client_secret.json, giờ bấm Kết nối YouTube" : (r.msg || "Không nạp được file")); refresh();
+};
+$("#ytConnectBtn").onclick = async () => {
+  const r = await post("/api/youtube/connect");
+  toast(r.ok ? "Đã mở trang đăng nhập Google trong trình duyệt" : (r.msg || "Không mở được trang đăng nhập"));
+};
+$("#ytOff").onclick = async () => {
+  if (!await ask("Ngắt kết nối YouTube?", $("#ytChannel").textContent, "CommentKit sẽ thu hồi quyền đăng video và tắt tự đăng. Video đã đăng không bị ảnh hưởng.", "Ngắt kết nối")) return;
+  await post("/api/youtube/disconnect"); refresh();
+};
+$("#ytAuto").onchange = e => post("/api/settings", {yt_auto:e.target.checked}).then(refresh);
+$("#ytPrivacy").onchange = e => post("/api/settings", {yt_privacy:e.target.value}).then(refresh);
+$("#ytSlots").onchange = e => post("/api/settings", {yt_slots:e.target.value}).then(() => { toast("Đã lưu khung giờ"); refresh(); });
 $("#voiceFind").onclick = async () => {
   toast("Đang tìm VieNeu trên máy…");
   const r = await post("/api/voice/detect");

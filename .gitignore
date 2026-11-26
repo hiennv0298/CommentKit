@@ -23,3 +23,6 @@ state/
 *.log
 # scripts made from real screenshots stay local
 samples/joke-*.json
+# token và OAuth client của YouTube (khi chạy từ mã nguồn, thư mục dữ liệu là chính repo)
+.youtube/
+client_secret*.json

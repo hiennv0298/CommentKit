@@ -66,9 +66,34 @@ Ví dụ:
 { "channel_handle": "Zapp-moments", "tts": { "speed": 1.1 } }
 ```
 
+## Đăng lên YouTube
+
+CommentKit có thể tự đăng video vừa làm xong lên kênh của bạn, hoặc đăng từng video bằng nút **Đăng YouTube**. Tool dùng YouTube Data API dưới chính tài khoản của bạn, nên cần một OAuth client của Google Cloud. Việc này miễn phí, chỉ làm một lần, mất khoảng 5 phút.
+
+**1. Tạo OAuth client** (dùng tài khoản Google đang sở hữu kênh):
+1. Vào [console.cloud.google.com](https://console.cloud.google.com/), tạo một project mới, ví dụ `CommentKit`.
+2. **APIs & Services → Library**, tìm **YouTube Data API v3**, bấm **Enable**.
+3. **Google Auth Platform → Branding**: điền tên app (ví dụ `CommentKit`) và email hỗ trợ. Ở mục **Audience**, chọn **External**.
+4. Vẫn trong **Audience**, bấm **Publish app** để chuyển sang *In production*. Nếu để chế độ *Testing* thì quyền đăng video hết hạn sau 7 ngày và phải kết nối lại. Hoặc giữ *Testing* và thêm email của bạn vào **Test users**.
+5. **Clients → Create client → Application type: Desktop app**, đặt tên, bấm **Create**, rồi **Download JSON**. Bạn được file `client_secret_….json`.
+
+**2. Kết nối trong CommentKit:**
+1. Ở mục **YouTube**, bấm **Nạp file client_secret.json** và chọn file vừa tải.
+2. Bấm **Kết nối YouTube**. Trình duyệt mở trang đăng nhập Google: chọn tài khoản và kênh, cho phép quyền đăng video. Nếu Google báo *"Google hasn't verified this app"*, bấm **Advanced → Go to CommentKit (unsafe)**. Đây là app của chính bạn tạo ở bước trên.
+3. Quay lại CommentKit, mục YouTube hiện tên kênh. Chọn:
+   - **Tự đăng video mới làm xong**: bật để video làm xong được đăng luôn.
+   - **Chế độ hiển thị**: Riêng tư, Không công khai, Công khai, hoặc **Hẹn giờ theo khung giờ**. Hẹn giờ thì mỗi video lấy khung trống gần nhất trong danh sách, ví dụ `11:30, 20:00`, nên mỗi ngày đăng đều 2 clip.
+
+Video đăng lên có sẵn tiêu đề, mô tả, hashtag, tag, thể loại *Hài*, ngôn ngữ tiếng Việt, *Không dành cho trẻ em*, và mục công bố **nội dung tổng hợp** (vì dùng giọng AI). Trên mỗi video trong app có link tới video đã đăng.
+
+**Giới hạn của Google, cần biết:**
+- **Project chưa qua kiểm duyệt thì video đăng qua API bị khoá ở chế độ riêng tư**, kể cả khi bạn chọn Công khai. Muốn đăng công khai hoặc hẹn giờ tự động, gửi [form kiểm duyệt YouTube API](https://support.google.com/youtube/contact/yt_api_form) (miễn phí, thường mất vài tuần). Trong lúc chờ, cứ để tool tải lên ở chế độ riêng tư rồi bạn tự bật công khai trong YouTube Studio.
+- **Hạn mức mặc định khoảng 6 video/ngày** (10.000 đơn vị, mỗi lần tải lên tốn 1.600). Hết hạn mức thì tool dừng đăng, hôm sau bấm **Đăng YouTube** lại.
+- File `client_secret` và quyền đăng nhập được lưu ở `%LOCALAPPDATA%\CommentKit\.youtube\`. Bấm **Ngắt kết nối** để thu hồi quyền.
+
 ## Trước khi đăng
 
-- Bật mục công bố **nội dung đã chỉnh sửa hoặc tổng hợp** trên YouTube, vì video dùng giọng AI.
+- Bật mục công bố **nội dung đã chỉnh sửa hoặc tổng hợp** trên YouTube, vì video dùng giọng AI. Nếu đăng bằng CommentKit thì mục này đã được bật sẵn.
 - Mô tả video đã ghi sẵn là nội dung dựng lại hoặc hư cấu, tên người dùng đã ẩn và giọng đọc là AI.
 - Ở gói miễn phí của Gemini, Google có thể dùng dữ liệu gửi lên, kể cả ảnh chụp, để cải thiện sản phẩm.
 

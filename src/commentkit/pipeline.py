@@ -25,6 +25,9 @@ DEFAULT_SETTINGS = dict(
     compose_auto=False,          # tự sáng tác khi inbox trống
     compose_per_day=3,
     check_updates=True,          # tự kiểm tra bản mới trên GitHub
+    yt_auto=False,               # tự đăng video mới làm xong lên YouTube
+    yt_privacy="private",        # private | unlisted | public | schedule (hẹn giờ theo khung)
+    yt_slots="11:30, 20:00",     # khung giờ đăng khi hẹn giờ
 )
 HISTORY_PATH = os.path.join(ROOT, "state", "compose_history.json")
 STABLE_SEC = 8      # file phải "yên" từng này giây (đã chép xong) mới xử lý
@@ -352,8 +355,37 @@ def list_outputs(output_dir, limit=60):
             pass
         res.append(dict(name=name, title=meta.get("title", name), description=meta.get("description", ""),
                         tags=meta.get("tags", []), duration=meta.get("duration"), background=meta.get("background"),
-                        source=meta.get("source")))
+                        source=meta.get("source"), youtube=meta.get("youtube"), youtube_error=meta.get("youtube_error")))
     return res
+
+
+def load_meta(out_dir):
+    try:
+        return json.load(open(os.path.join(out_dir, "metadata.json"), encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def update_meta(out_dir, **fields):
+    """Ghi thêm/xoá trường trong metadata.json của một video (None = xoá)."""
+    meta = load_meta(out_dir)
+    for k, v in fields.items():
+        if v is None:
+            meta.pop(k, None)
+        else:
+            meta[k] = v
+    json.dump(meta, open(os.path.join(out_dir, "metadata.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    return meta
+
+
+def scheduled_times(output_dir):
+    """Các giờ đăng đã hẹn (RFC 3339 UTC) của những video đã tải lên, để không hẹn trùng khung."""
+    out = []
+    for o in list_outputs(output_dir, limit=500):
+        at = (o.get("youtube") or {}).get("publish_at")
+        if at:
+            out.append(at)
+    return out
 
 
 # ---------- tự sáng tác ----------
