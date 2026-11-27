@@ -123,7 +123,7 @@ button.danger:hover{filter:brightness(1.08)}
         <label><input type="radio" name="mode" value="group" checked> Các ảnh cùng 1 bài → 1 video</label>
         <label><input type="radio" name="mode" value="each"> Mỗi ảnh 1 video</label>
       </div>
-      <p class="empty" style="margin:10px 0 0">Bạn cũng có thể chép thẳng ảnh vào thư mục inbox: các ảnh chép vào cùng lúc là một bài (xếp theo tên, AI tự nhận ra ảnh nào là bài gốc); một thư mục con cũng là một bài.</p>
+      <p class="empty" style="margin:10px 0 0">Bạn cũng có thể chép thẳng ảnh vào thư mục inbox: các ảnh chép vào cùng lúc là một bài (xếp theo tên, AI tự nhận ra ảnh nào là bài gốc; đặt tên ảnh bài gốc là <b>post</b> để chỉ chắc chắn); một thư mục con cũng là một bài.</p>
     </div>
 
     <div class="box">
@@ -204,7 +204,8 @@ button.danger:hover{filter:brightness(1.08)}
         <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="sm" data-chk="claude">Kiểm tra Claude</button><button class="sm" data-chk="openai">Kiểm tra OpenAI</button><button class="sm" data-chk="gemini">Kiểm tra Gemini</button></div>
         <label class="f">Python của VieNeu <span id="ttsState"></span> · để trống để dùng bản CommentKit tự cài</label><input class="t" id="sTts" placeholder="C:\duong\dan\venv\Scripts\python.exe">
         <div class="empty" id="homeInfo"></div>
-        <label class="f" style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="sUpd"> Tự kiểm tra bản mới (khi mở app và vài tiếng một lần)</label>
+        <label class="f" style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="sBlur"> Làm mờ tên người, @username, số điện thoại trong hình (AI dò)</label>
+        <label class="f" style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="sUpd"> Tự kiểm tra bản mới (khi mở app và vài tiếng một lần)</label>
         <div class="empty" id="updNote"></div><button class="sm" id="updCheck">Kiểm tra bản mới</button>
         <div style="margin-top:10px"><button class="pri" id="save">Lưu</button></div>
       </details>
@@ -375,6 +376,7 @@ async function refresh(){
     $("#pRead").value = s.settings.provider_read; $("#pComp").value = s.settings.provider_compose; $("#oModel").value = s.openai_model || ""; $("#gModel").value = s.gemini_model || "";
     $("#sTts").value = s.voice.managed ? "" : s.voice.python;
     $("#sUpd").checked = s.settings.check_updates !== false;
+    $("#sBlur").checked = s.settings.blur_names !== false;
   }
 }
 
@@ -416,7 +418,7 @@ $("#save").onclick = () => post("/api/settings", {inbox_dir:$("#sInbox").value, 
     interval_sec:+$("#sInt").value, provider_read:$("#pRead").value, provider_compose:$("#pComp").value,
     openai_key:$("#oKey").value.trim(), openai_model:$("#oModel").value.trim(),
     gemini_key:$("#gKey").value.trim(), gemini_model:$("#gModel").value.trim(), tts_python:$("#sTts").value.trim(),
-    check_updates:$("#sUpd").checked})
+    check_updates:$("#sUpd").checked, blur_names:$("#sBlur").checked})
   .then(r => { if (!r.ok) return toast(r.msg || "Chưa lưu được"); toast("Đã lưu"); $("#oKey").value=""; $("#gKey").value=""; settingsFilled=false; shownOutputs=""; refresh(); });
 
 document.body.addEventListener("click", async e => {

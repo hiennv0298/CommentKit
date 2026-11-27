@@ -21,13 +21,13 @@ Dữ liệu của bạn nằm ở `%LOCALAPPDATA%\CommentKit`: key (`.env`), `co
 
 ## Cách dùng
 
-**Từ ảnh chụp:** lướt Threads, chụp màn hình bài hay cùng các bình luận, rồi thả ảnh vào app (kéo thả, bấm chọn, hoặc dán bằng Ctrl+V). Chọn "các ảnh cùng 1 bài → 1 video" hoặc "mỗi ảnh 1 video". Cũng có thể chép thẳng ảnh vào thư mục inbox: các ảnh chép vào cùng một lượt (cách nhau dưới 20 giây) là một bài, xếp theo tên; một thư mục con cũng là một bài. AI tự nhận ra ảnh nào là bài gốc, ảnh nào là bình luận.
+**Từ ảnh chụp:** lướt Threads, chụp màn hình bài hay cùng các bình luận, rồi thả ảnh vào app (kéo thả, bấm chọn, hoặc dán bằng Ctrl+V). Chọn "các ảnh cùng 1 bài → 1 video" hoặc "mỗi ảnh 1 video". Cũng có thể chép thẳng ảnh vào thư mục inbox: các ảnh chép vào cùng một lượt (cách nhau dưới 20 giây) là một bài, xếp theo tên; một thư mục con cũng là một bài. AI tự nhận ra ảnh nào là bài gốc, ảnh nào là bình luận. Muốn chỉ chắc chắn thì **đặt tên ảnh bài gốc có chữ `post`** (vd `post.png`): tool dùng bài đó làm chủ đề và cắt hình trong ảnh đó làm hình của bài.
 
 Khi bật **Tự động**, CommentKit quét inbox 30 giây một lần. Với mỗi bài, tool làm các bước sau:
 1. AI đọc ảnh: viết lại bài bằng lời của nó, thay mọi tên người dùng bằng tên che bịa ngẫu nhiên, viết lại các bình luận hay, thêm bình luận của riêng nó, gán mỗi câu cho một nhân vật, đặt tiêu đề, mô tả và tag. Khoảng một nửa số câu viết kiểu Gen Z (teencode, viết tắt), giọng đọc vẫn đọc câu đầy đủ. Bài nhạy cảm thì bỏ qua.
-2. Nếu bài gốc hoặc bình luận có hình/meme, tool tự cắt hình đó ra khỏi ảnh chụp và gắn vào đúng thẻ.
+2. Nếu bài gốc hoặc bình luận có hình/meme, tool tự cắt hình đó ra khỏi ảnh chụp và gắn vào đúng thẻ. AI soi thêm tên người, @username, số điện thoại... trong hình và tool làm mờ những chỗ đó (tắt được trong Cài đặt).
 3. VieNeu-TTS đọc từng câu bằng giọng của nhân vật đó.
-4. Dựng video 1080×1920: gameplay phủ kín màn hình, mỗi lúc một thẻ, đổi thẻ đúng lúc giọng đọc tới câu đó.
+4. Dựng video 1080×1920, dài khoảng 45-60 giây: gameplay phủ kín màn hình, mỗi lúc một thẻ, đổi thẻ đúng lúc giọng đọc tới câu đó. Câu trả lời của trả lời nằm chung thẻ với bình luận được trả lời (như Threads) và hiện ra sau khi bình luận đó đọc xong.
 5. Ảnh đã đọc chuyển sang `inbox/_done`, nên không bị đọc lại. Ảnh lỗi chuyển sang `inbox/_failed`, bấm **Thử lại** để chạy lại.
 
 **Tự sáng tác:** chọn chủ đề (để ngẫu nhiên, hoặc gõ chủ đề riêng) rồi bấm **Sáng tác**. Tool cũng có thể tự sáng tác khi inbox trống, có giới hạn số video mỗi ngày. Các ý đã làm được ghi nhớ để không lặp lại.

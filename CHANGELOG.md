@@ -3,6 +3,14 @@
 Mục của mỗi phiên bản là ghi chú phát hành trên trang GitHub Releases.
 Thêm mục `## <phiên bản>` ở đây trước khi đẩy tag `v<phiên bản>`.
 
+## 0.1.6
+
+- **Ảnh đặt tên "post" là bài gốc.** Đặt tên ảnh chụp bài gốc có chữ `post` (vd `post.png`, `Post_1.jpg`) thì tool dùng chắc chắn bài đó làm chủ đề câu chuyện và cắt hình/meme trong ảnh đó làm hình của bài, không để AI đoán.
+- **Làm mờ tên trong hình.** Sau khi cắt hình/meme, AI soi tên người, @username, số điện thoại, email, biển số... trong hình; tool nới khung cho ôm trọn dòng chữ rồi làm mờ trước khi dựng video. Chữ chú thích meme và tên người nổi tiếng giữ nguyên. Tắt được trong Cài đặt.
+- **Trả lời của trả lời giống Threads.** Câu trả lời (thường là tác giả bài trả lời bình luận) nằm chung thẻ với bình luận được trả lời, thụt vào, nối bằng đường kẻ, có nhãn "Tác giả". Thẻ hiện bình luận trước, đọc xong mới hiện dần câu trả lời bên dưới.
+- **Video dài 45-60 giây.** Tối đa 10 bình luận; AI được báo số chữ cần viết theo tốc độ đọc, kịch bản còn ngắn thì AI viết thêm bình luận một lần nữa.
+- Thả ảnh vào app giữ nguyên tên file (để nhận ra ảnh "post").
+
 ## 0.1.5
 
 - **Tự đăng lên YouTube.** Nạp file OAuth client của Google Cloud (hướng dẫn trong README, làm một lần), bấm **Kết nối YouTube**, rồi:

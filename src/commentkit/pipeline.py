@@ -4,10 +4,10 @@ import json, os, re, shutil, subprocess, time, traceback
 from PIL import Image
 from datetime import datetime
 
-from .write_script import write_script_from_images, write_script_original
+from .write_script import find_private, write_script_from_images, write_script_original
 from .llm import AuthError, LLMError  # noqa: F401
 from .render import render
-from .crop import detect_photos
+from .crop import blur_boxes, detect_photos
 from .paths import NO_WINDOW, PKG, home
 from . import voice
 
@@ -25,6 +25,7 @@ DEFAULT_SETTINGS = dict(
     compose_auto=False,          # tự sáng tác khi inbox trống
     compose_per_day=3,
     check_updates=True,          # tự kiểm tra bản mới trên GitHub
+    blur_names=True,             # AI dò tên người / @username / số điện thoại trong hình rồi làm mờ
     yt_auto=False,               # tự đăng video mới làm xong lên YouTube
     yt_privacy="private",        # private | unlisted | public | schedule (hẹn giờ theo khung)
     yt_slots="11:30, 20:00",     # khung giờ đăng khi hẹn giờ
@@ -267,9 +268,29 @@ def _cut(job, ref, tag, cache):
     return tmp
 
 
-def attach_photos(script, job, log=print):
-    """Gắn hình/meme thật vào bài gốc và vào những bình luận AI đánh dấu là có hình."""
+POST_NAME = re.compile(r"(^|[^a-z])post([^a-z]|$)")
+
+
+def post_index(images):
+    """Vị trí ảnh người dùng đặt tên có chữ "post" (post.png, Post_1.jpg, 01-post.png...), hoặc None."""
+    for i, p in enumerate(images):
+        if POST_NAME.search(os.path.splitext(os.path.basename(p))[0].lower()):
+            return i
+    return None
+
+
+def attach_photos(script, job, log=print, post_idx=None):
+    """Gắn hình/meme thật vào bài gốc và vào những bình luận AI đánh dấu là có hình.
+    post_idx: ảnh người dùng đặt tên "post" -> hình trong ảnh đó chắc chắn là hình của bài."""
     cache = {}
+    if post_idx is not None:
+        cache[post_idx] = detect_photos(job["images"][post_idx])
+        if cache[post_idx]:
+            ref = script.get("post_image")
+            nth = ref.get("nth") if isinstance(ref, dict) and ref.get("index") == post_idx else None
+            if not isinstance(nth, int):   # AI không chỉ: lấy hình lớn nhất trong ảnh post
+                nth = max(range(len(cache[post_idx])), key=lambda k: cache[post_idx][k].width * cache[post_idx][k].height)
+            script["post_image"] = {"index": post_idx, "nth": nth}
     targets = [("post", script.get("post_image"), script.get("post"))]
     targets += [(f"c{k}", c.get("image"), c) for k, c in enumerate(script.get("comments", []))]
     for tag, ref, item in targets:
@@ -289,19 +310,46 @@ def attach_photos(script, job, log=print):
             log(f"  cắt được hình {'của bài' if tag == 'post' else 'của bình luận ' + tag[1:]} {w}x{h}")
 
 
+def blur_private(script, cfg, provider, log=print):
+    """AI dò tên người, @username, số điện thoại... trong các hình sẽ hiện trong video rồi làm mờ."""
+    items = [it for it in [script.get("post")] + list(script.get("comments", [])) if it and it.get("image")]
+    if not items:
+        return 0
+    try:
+        found = find_private([it["image"] for it in items], cfg, provider)
+    except Exception as e:  # noqa: BLE001 - không dò được thì vẫn làm video, chỉ báo
+        log(f"  ! không dò được tên trong hình: {e}")
+        return 0
+    total = 0
+    for i, boxes in found.items():
+        if 0 <= i < len(items):
+            total += blur_boxes(items[i]["image"], boxes)
+    if total:
+        log(f"  làm mờ {total} chỗ có tên/thông tin cá nhân trong hình")
+    return total
+
+
 def process_job(job, cfg, settings, log=print):
     """Đọc ảnh -> kịch bản -> video. Xong thì đánh dấu đã đọc. Lỗi đăng nhập Claude thì để nguyên trong inbox."""
     inbox = settings["inbox_dir"]
-    log(f"▶ {job['name']}: {settings.get('provider_read', 'claude')} đọc {len(job['images'])} ảnh...")
+    pidx = post_index(job["images"])
+    if pidx:   # ảnh "post" lên đầu: AI và người xem đọc bài gốc trước
+        imgs = job["images"]
+        job = dict(job, images=[imgs[pidx]] + imgs[:pidx] + imgs[pidx + 1:])
+        pidx = 0
+    log(f"▶ {job['name']}: {settings.get('provider_read', 'claude')} đọc {len(job['images'])} ảnh"
+        + (f", bài gốc là {os.path.basename(job['images'][pidx])}" if pidx is not None else "") + "...")
     try:
-        script = write_script_from_images(job["images"], cfg, slug(job["name"]), settings.get("provider_read", "claude"))
+        script = write_script_from_images(job["images"], cfg, slug(job["name"]), settings.get("provider_read", "claude"), pidx)
     except AuthError:
         raise
     except (LLMError, RuntimeError) as e:
         log(f"✖ {job['name']}: {e}")
         mark(job, inbox, "_failed", dict(error=str(e)))
         return None
-    attach_photos(script, job, log)
+    attach_photos(script, job, log, pidx)
+    if settings.get("blur_names", True):
+        blur_private(script, cfg, settings.get("provider_read", "claude"), log)
     if script.get("skip"):
         reason = script.get("reason", "")
         log(f"⤼ {job['name']}: Claude bỏ qua ({reason})")

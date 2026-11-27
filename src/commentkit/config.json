@@ -71,10 +71,10 @@
     "width": 1080,
     "height": 1920,
     "fps": 30,
-    "max_comments": 7,
+    "max_comments": 10,
     "target_sec": [
-      30,
-      58
+      45,
+      60
     ],
     "bgm": "",
     "bgm_volume": 0.08

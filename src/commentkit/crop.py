@@ -5,7 +5,7 @@
    (hình có thể có mảng trắng lớn, vd nhân vật trắng trong meme).
 4. Một ảnh chụp có thể có nhiều hình (bài gốc có hình, bình luận cũng có hình): tìm xong hình nào thì xoá nó khỏi
    mặt nạ rồi tìm tiếp. detect_photos trả các hình theo thứ tự từ trên xuống."""
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageFilter
 
 
 def _mask(im):
@@ -124,3 +124,85 @@ def detect_photo(path, min_h=120):
     """Hình lớn nhất trong ảnh chụp (hoặc None)."""
     photos = detect_photos(path, min_h)
     return max(photos, key=lambda p: p.width * p.height) if photos else None
+
+
+def _grow_to_text(im, L, T, R, B):
+    """AI chỉ khung gần đúng: nới khung cho tới khi ôm trọn dòng chữ (dò điểm "mực" khác màu nền quanh khung)."""
+    from PIL import ImageStat
+
+    W, H = im.size
+    h = max(4, B - T)
+    area = im.crop((max(0, L - h), max(0, T - h), min(W, R + h), min(H, B + h)))
+    bg = tuple(int(v) for v in ImageStat.Stat(area).median)
+
+    def ink(box):
+        strip = im.crop(box)
+        d = ImageChops.difference(strip, Image.new("RGB", strip.size, bg)).convert("L")
+        return d.point(lambda v: 255 if v > 48 else 0).getbbox() is not None
+
+    def grow(L, T, R, B, vertical):
+        if vertical:   # trên/dưới: tới hết chiều cao dòng chữ, tối đa thêm 60% chiều cao khung mỗi bên
+            lim, gap = int(0.6 * h) + 2, 2
+            for step in (-1, 1):
+                y, miss, edge = (T - 1, 0, T) if step < 0 else (B, 0, B)
+                for _ in range(lim):
+                    if not 0 <= y < H:
+                        break
+                    if ink((L, y, R, y + 1)):
+                        edge, miss = (y if step < 0 else y + 1), 0
+                    else:
+                        miss += 1
+                        if miss > gap:
+                            break
+                    y += step
+                T, B = (edge, B) if step < 0 else (T, edge)
+        else:          # trái/phải: theo hết các chữ liền nhau, khoảng trống giữa chữ < nửa chiều cao dòng
+            lim, gap = int(2.5 * h), max(3, (B - T) // 2)
+            for step in (-1, 1):
+                x, miss, edge = (L - 1, 0, L) if step < 0 else (R, 0, R)
+                for _ in range(lim):
+                    if not 0 <= x < W:
+                        break
+                    if ink((x, T, x + 1, B)):
+                        edge, miss = (x if step < 0 else x + 1), 0
+                    else:
+                        miss += 1
+                        if miss > gap:
+                            break
+                    x += step
+                L, R = (edge, R) if step < 0 else (L, edge)
+        return L, T, R, B
+
+    L, T, R, B = grow(L, T, R, B, True)
+    L, T, R, B = grow(L, T, R, B, False)
+    return grow(L, T, R, B, True)
+
+
+def blur_boxes(path, boxes, pad=0.012):
+    """Làm mờ các vùng [x0, y0, x1, y1] (phần nghìn 0-1000 của rộng/cao ảnh): nới khung cho ôm trọn chữ, thêm pad
+    cho chắc. Trả về số vùng đã làm mờ."""
+    im = Image.open(path).convert("RGB")
+    W, H = im.size
+    n = 0
+    for b in boxes or []:
+        try:
+            x0, y0, x1, y1 = (float(v) for v in b[:4])
+        except (TypeError, ValueError):
+            continue
+        x0, x1 = sorted((x0, x1))
+        y0, y1 = sorted((y0, y1))
+        L, T = max(0, int(x0 / 1000 * W)), max(0, int(y0 / 1000 * H))
+        R, B = min(W, int(x1 / 1000 * W) + 1), min(H, int(y1 / 1000 * H) + 1)
+        if R - L < 2 or B - T < 2:
+            continue
+        L, T, R, B = _grow_to_text(im, L, T, R, B)
+        px, py = int(pad * W) + 2, int(pad * H) + 2
+        L, T, R, B = max(0, L - px), max(0, T - py), min(W, R + px), min(H, B + py)
+        region = im.crop((L, T, R, B))
+        small = region.resize((max(1, (R - L) // 14), max(1, (B - T) // 14)), Image.BILINEAR)   # làm vỡ chữ
+        region = small.resize(region.size, Image.NEAREST).filter(ImageFilter.GaussianBlur(max(3, (B - T) // 6)))
+        im.paste(region, (L, T))
+        n += 1
+    if n:
+        im.save(path)
+    return n

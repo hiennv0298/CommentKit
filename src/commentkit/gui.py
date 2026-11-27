@@ -291,14 +291,20 @@ def upload():
         d = os.path.join(inbox, f"{stamp}-post")
         os.makedirs(d, exist_ok=True)
         for i, f in enumerate(files, 1):
-            f.save(os.path.join(d, f"{i:02d}{os.path.splitext(f.filename)[1].lower()}"))
+            f.save(os.path.join(d, f"{i:02d}-{_safe_name(f.filename)}"))
     else:   # mỗi ảnh một thư mục: ảnh lẻ thả vào cùng lúc sẽ bị gộp thành một bài
         for i, f in enumerate(files, 1):
             d = os.path.join(inbox, f"{stamp}-{i:02d}")
             os.makedirs(d, exist_ok=True)
-            f.save(os.path.join(d, f"01{os.path.splitext(f.filename)[1].lower()}"))
+            f.save(os.path.join(d, f"01-{_safe_name(f.filename)}"))
     W.log(f"Đã nhận {len(files)} ảnh")
     return jsonify(ok=True, n=len(files))
+
+
+def _safe_name(filename):
+    """Giữ tên gốc (để nhận ra ảnh tên "post"), bỏ ký tự lạ."""
+    stem, ext = os.path.splitext(filename)
+    return (secure_filename(stem) or "anh")[:60] + ext.lower()
 
 
 @app.post("/api/scan")
@@ -350,6 +356,8 @@ def set_settings():
     if "yt_slots" in body:
         slots = youtube.parse_slots(body["yt_slots"])
         W.settings["yt_slots"] = ", ".join(f"{h:02d}:{m:02d}" for h, m in slots) or "11:30, 20:00"
+    if "blur_names" in body:
+        W.settings["blur_names"] = bool(body["blur_names"])
     if "check_updates" in body:
         W.settings["check_updates"] = bool(body["check_updates"])
     if "interval_sec" in body:

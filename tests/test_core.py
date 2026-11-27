@@ -199,3 +199,104 @@ def test_finds_an_existing_vieneu_venv_and_its_model(tmp_path):
     dirs = set(voice._walk_dirs(tmp_path, 3))
     assert venv in dirs and not any("Windows" in str(d) for d in dirs)
     assert voice._model_cache_near(venv / "Scripts" / "python.exe") == tmp_path / "ZAPP" / "Studio" / ".cache" / "hf"
+
+
+def test_post_named_file_is_found():
+    names = ["Screenshot_1.png", "IMG_post (2).webp", "x.png"]
+    assert P.post_index(names) == 1
+    assert P.post_index(["post.png"]) == 0 and P.post_index(["01-Post_1.JPG"]) == 0
+    assert P.post_index(["postcard.png", "repost.png", "a.png"]) is None
+
+
+def test_post_file_picture_wins_over_ai_choice(tmp_path):
+    shot = tmp_path / "a.png"
+    _two_picture_shot(shot)                                   # ảnh có 2 hình: xanh (lớn hơn) và cam
+    other = tmp_path / "b.png"
+    _png(other, (800, 1400))
+    script = {"post_image": {"index": 1, "nth": 0}, "post": {"text": "x"}, "comments": []}
+    P.attach_photos(script, {"name": "t", "images": [str(shot), str(other)]}, log=lambda *a: None, post_idx=0)
+    assert script["post_image"]["index"] == 0
+    assert Image.open(script["post"]["image"]).getpixel((10, 10))[2] > 150   # hình xanh của ảnh post
+
+
+def test_blur_boxes_only_touches_the_box(tmp_path):
+    from commentkit.crop import blur_boxes
+
+    p = tmp_path / "meme.png"
+    im = Image.new("RGB", (400, 200), (255, 255, 255))
+    d = ImageDraw.Draw(im)
+    for x in range(20, 180, 6):                     # "chữ" sọc đen trắng ở góc trái trên
+        d.rectangle((x, 20, x + 2, 60), fill=(0, 0, 0))
+    d.rectangle((300, 120, 380, 180), fill=(200, 30, 30))
+    im.save(p)
+    assert blur_boxes(str(p), [[40, 80, 460, 320]]) == 1
+    out = Image.open(p)
+    stripes = [out.getpixel((x, 40))[0] for x in range(30, 170)]
+    assert max(stripes) - min(stripes) < 120       # sọc đã nhoè, không còn đen/trắng rõ
+    assert out.getpixel((340, 150)) == (200, 30, 30)   # ngoài vùng không đổi
+    assert blur_boxes(str(p), [[1, 2]]) == 0
+
+
+def test_process_job_passes_post_first_and_blurs(tmp_path, monkeypatch):
+    inbox = tmp_path / "inbox"
+    for n in ("Screenshot_1.png", "post.png"):
+        _png(inbox / "bai" / n)
+    job = P.list_jobs(str(inbox))[0]
+    seen = {}
+
+    def fake_write(images, cfg, name, provider, post_index=None):
+        seen.update(images=[os.path.basename(i) for i in images], post_index=post_index)
+        return {"skip": True, "reason": "test", "post": {"text": "x"}, "comments": []}
+
+    monkeypatch.setattr(P, "write_script_from_images", fake_write)
+    monkeypatch.setattr(P, "blur_private", lambda *a, **k: seen.setdefault("blur", True))
+    P.process_job(job, P.load_cfg(), {"inbox_dir": str(inbox), "blur_names": True}, log=lambda *a: None)
+    assert seen == {"images": ["post.png", "Screenshot_1.png"], "post_index": 0, "blur": True}
+
+
+def test_blur_private_applies_ai_boxes(tmp_path, monkeypatch):
+    p = tmp_path / "h.png"
+    Image.new("RGB", (100, 100), (0, 0, 0)).save(p)
+    ImageDraw.Draw(im := Image.open(p).convert("RGB")).rectangle((0, 0, 49, 99), fill=(255, 255, 255))
+    im.save(p)
+    monkeypatch.setattr(P, "find_private", lambda images, cfg, provider: {0: [[0, 0, 500, 1000]]})
+    script = {"post": {"text": "x", "image": str(p)}, "comments": [{"who": "genz", "text": "y"}]}
+    assert P.blur_private(script, P.load_cfg(), "claude", log=lambda *a: None) == 1
+
+
+def test_short_script_gets_extended_once(monkeypatch):
+    from commentkit import write_script as WS
+
+    cfg = P.load_cfg()
+    t = WS.syllable_target(cfg)
+    assert 190 <= t["syl_min"] <= 215 and t["syl_max"] > t["syl_min"]        # 45-60 giây ở tốc độ 1.2
+    short = {"post": {"text": "a", "tts": "một hai ba"}, "comments": [{"who": "genz", "text": "x", "tts": "bốn năm"}] * 3}
+    long_ = {"post": short["post"], "comments": [{"who": "genz", "text": "x", "tts": " ".join(["chữ"] * 25)}] * 9}
+    calls = []
+    monkeypatch.setattr(WS, "generate", lambda prompt, cfg, provider, images=None: calls.append(prompt) or json.dumps(long_))
+    out = WS._ensure_length(WS._validate(json.loads(json.dumps(short)), cfg, ""), cfg, "claude", "RULES", "")
+    assert len(calls) == 1 and "quá ngắn" in calls[0] and WS.syllables(out) > 200
+    assert WS._ensure_length(out, cfg, "claude", "RULES", "") is out and len(calls) == 1   # đủ dài: không hỏi lại
+
+
+def test_reply_to_is_renumbered_and_author_marked():
+    from commentkit.write_script import _validate
+
+    data = {"post": {"text": "p", "handle": "t***.hh"}, "comments": [
+        {"who": "genz", "text": "a"}, {"who": "ai_do", "text": "bỏ"}, {"who": "ba_thim", "text": "b"},
+        {"who": "nguoi_dang", "text": "trả lời b", "reply_to": 2, "handle": "khac"}, {"who": "ong_chu", "text": "c", "reply_to": 9}]}
+    out = _validate(data, P.load_cfg(), "")
+    assert [c.get("reply_to") for c in out["comments"]] == [None, None, 1, None]
+    assert out["comments"][2]["author"] is True and out["comments"][2]["handle"] == "t***.hh"
+
+
+def test_reply_shares_its_parents_card():
+    from commentkit.render import groups_of, make_cards
+
+    script = json.load(open(ROOT / "samples" / "demo_script.json", encoding="utf-8"))
+    script["comments"][1]["reply_to"] = 0
+    script["comments"][2]["reply_to"] = 0
+    groups, line_group = groups_of(script)
+    assert line_group[:5] == [0, 1, 1, 1, 2]
+    cards = make_cards(script)
+    assert cards[2].height > cards[1].height and cards[3].height > cards[2].height   # thẻ lớn dần theo câu trả lời

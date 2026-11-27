@@ -52,19 +52,22 @@ def color_of(h):
 class Layout:
     """Đo sẵn chiều cao từng mục (bài đăng + bình luận) để cuộn chính xác."""
 
-    def __init__(self, script, W):
+    def __init__(self, script, W, entries=None):
+        """entries: [(dữ liệu, là bài gốc?, là trả lời lồng?)]; mặc định là bài gốc + mọi bình luận."""
         self.W = W
-        self.items = [self._item(script["post"], True)]
-        self.items += [self._item(c, False) for c in script["comments"]]
+        if entries is None:
+            entries = [(script["post"], True, False)] + [(c, False, False) for c in script["comments"]]
+        self.items = [self._item(d, post, nested) for d, post, nested in entries]
         y = 0
         for it in self.items:
             it["y"] = y
             y += it["h"]
         self.total = y
 
-    def _item(self, d, post):
-        av = 92 if post else 72
-        x_text = 44 + av + 24
+    def _item(self, d, post, nested=False):
+        av = 92 if post else (56 if nested else 72)
+        ax = 44 + 72 + 24 if nested else 44            # trả lời lồng: thụt vào, avatar thẳng hàng chữ của bình luận cha
+        x_text = ax + av + 22
         tf = FT["text_p" if post else "text_c"]
         lines = wrap(d.get("text", ""), tf, self.W - x_text - 52)
         lh = int(tf.size * 1.32)
@@ -74,28 +77,43 @@ class Layout:
             mw, mh = self.W - x_text - 52, 460
             s = min(mw / im.width, mh / im.height)
             photo = im.resize((max(1, int(im.width * s)), max(1, int(im.height * s))), Image.LANCZOS)
-        h = 34 + 54 + len(lines) * lh + (photo.height + 18 if photo else 0) + 80 + 18
-        return dict(d=d, post=post, av=av, x=x_text, lines=lines, lh=lh, h=h, photo=photo)
+        h = (18 if nested else 34) + 54 + len(lines) * lh + (photo.height + 18 if photo else 0) + 80 + 18
+        return dict(d=d, post=post, nested=nested, av=av, ax=ax, x=x_text, lines=lines, lh=lh, h=h, photo=photo)
 
     def draw(self, upto, active):
         img = Image.new("RGB", (self.W, self.total + 10), BG)
         dr = ImageDraw.Draw(img)
-        for i, it in enumerate(self.items[: upto + 1]):
-            self._draw_item(img, dr, it, i == active)
+        shown = self.items[: upto + 1]
+        for i, it in enumerate(shown):
+            last = i == len(shown) - 1 or shown[i + 1]["nested"]
+            self._draw_item(img, dr, it, i == active, line=not last)
+            if it["nested"]:                               # đường nối từ avatar bình luận cha xuống câu trả lời
+                parent = next(p for p in reversed(shown[:i]) if not p["nested"])
+                px = parent["ax"] + parent["av"] / 2
+                top = parent["y"] + 34 + parent["av"] + 10
+                cy = it["y"] + 18 + it["av"] / 2
+                r = 22
+                dr.line([px, top, px, cy - r], fill=LINE, width=3)
+                dr.arc([px, cy - 2 * r, px + 2 * r, cy], 90, 180, fill=LINE, width=3)
+                dr.line([px + r, cy, it["ax"] - 10, cy], fill=LINE, width=3)
         return img
 
-    def _draw_item(self, img, dr, it, active):
+    def _draw_item(self, img, dr, it, active, line=True):
         d, y0, W = it["d"], it["y"], self.W
         if active:
             dr.rounded_rectangle([14, y0 + 6, W - 14, y0 + it["h"] - 6], 26, fill=ACTIVE)
         handle = clean(d.get("handle", "a***")) or "a***"
-        av, ax, ay = it["av"], 44, y0 + 34
+        av, ax, ay = it["av"], it["ax"], y0 + (18 if it["nested"] else 34)
         dr.ellipse([ax, ay, ax + av, ay + av], fill=color_of(handle))
-        dr.text((ax + av / 2, ay + av / 2), handle[:1].upper(), font=FT["avatar"], fill=WHITE, anchor="mm")
+        dr.text((ax + av / 2, ay + av / 2), handle[:1].upper(), font=FT["avatar"] if av > 60 else FT["meta"], fill=WHITE, anchor="mm")
         hf = FT["handle_p" if it["post"] else "handle_c"]
-        x, y = it["x"], y0 + 30
+        x, y = it["x"], ay - 4
         dr.text((x, y), handle, font=hf, fill=WHITE)
-        dr.text((x + hf.getlength(handle) + 16, y + 4), clean(d.get("time", "")) or "vừa xong", font=FT["meta"], fill=GRAY)
+        tx = x + hf.getlength(handle) + 16
+        tm = clean(d.get("time", "")) or "vừa xong"
+        dr.text((tx, y + 4), tm, font=FT["meta"], fill=GRAY)
+        if d.get("author") and not it["post"]:            # câu trả lời của chính người đăng bài, như Threads
+            dr.text((tx + FT["meta"].getlength(tm) + 12, y + 4), "· Tác giả", font=FT["meta"], fill=GRAY)
         y += 58
         tf = FT["text_p" if it["post"] else "text_c"]
         for ln in it["lines"]:
@@ -119,7 +137,8 @@ class Layout:
                 dr.text((cx, y + 3), clean(n), font=FT["meta"], fill=GRAY)
                 cx += FT["meta"].getlength(clean(n)) + 18
             cx += 24
-        dr.line([44, y0 + it["h"] - 2, W - 44, y0 + it["h"] - 2], fill=LINE, width=2)
+        if line:
+            dr.line([44, y0 + it["h"] - 2, W - 44, y0 + it["h"] - 2], fill=LINE, width=2)
 
 
 def fit_font(text, max_w, start, minimum=40):
@@ -154,19 +173,45 @@ REGION_Y = 150        # vùng phủ (hook + thẻ) bắt đầu từ y này trê
 REGION_H = 1250
 
 
+def groups_of(script):
+    """Gom bình luận với các câu trả lời của nó (reply_to) thành nhóm, mỗi nhóm một thẻ.
+    Trả về (nhóm [[(dữ liệu, là bài gốc?, là trả lời lồng?)]], nhóm của từng câu đọc [0 = bài gốc, 1.. = bình luận]).
+    Câu trả lời chỉ lồng vào thẻ đang hiện; trả lời một bình luận đã qua thì thành thẻ riêng."""
+    groups, ids = [[(script["post"], True, False)]], [["post"]]
+    line_group = [0]
+    for i, c in enumerate(script.get("comments", [])):
+        rt = c.get("reply_to")
+        if len(groups) > 1 and isinstance(rt, int) and rt in ids[-1]:
+            groups[-1].append((c, False, True))
+            ids[-1].append(i)
+        else:
+            groups.append([(c, False, False)])
+            ids.append([i])
+        line_group.append(len(groups) - 1)
+    return groups, line_group
+
+
+def _card(img):
+    band = img.convert("RGBA")
+    mask = Image.new("L", band.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, band.width - 1, band.height - 1], 30, fill=255)
+    card = Image.new("RGBA", band.size, (0, 0, 0, 0))
+    card.paste(band, (0, 0), mask)
+    ImageDraw.Draw(card).rounded_rectangle([0, 0, band.width - 1, band.height - 1], 30, outline=(60, 60, 60, 255), width=2)
+    return card
+
+
 def make_cards(script):
-    """Mỗi mục (bài gốc, từng bình luận) thành một thẻ RGBA bo góc nền tối."""
-    lay = Layout(script, CARD_W)
-    full = lay.draw(len(lay.items) - 1, active=-1)
-    cards = []
-    for it in lay.items:
-        band = full.crop((0, it["y"], CARD_W, it["y"] + it["h"] - 4)).convert("RGBA")
-        mask = Image.new("L", band.size, 0)
-        ImageDraw.Draw(mask).rounded_rectangle([0, 0, band.width - 1, band.height - 1], 30, fill=255)
-        card = Image.new("RGBA", band.size, (0, 0, 0, 0))
-        card.paste(band, (0, 0), mask)
-        ImageDraw.Draw(card).rounded_rectangle([0, 0, band.width - 1, band.height - 1], 30, outline=(60, 60, 60, 255), width=2)
-        cards.append(card)
+    """Thẻ RGBA hiện lúc đọc từng câu (bài gốc, từng bình luận). Câu trả lời lồng nằm chung thẻ với bình luận
+    cha: thẻ lúc đọc câu trả lời là thẻ của bình luận cha thêm câu trả lời bên dưới."""
+    groups, line_group = groups_of(script)
+    cards, stage = [], {}
+    for g in line_group:
+        s = stage[g] = stage.get(g, -1) + 1
+        lay = Layout(script, CARD_W, groups[g])
+        full = lay.draw(s, active=-1)
+        bottom = lay.items[s]["y"] + lay.items[s]["h"] - 4
+        cards.append(_card(full.crop((0, 0, CARD_W, bottom))))
     return cards
 
 
@@ -196,6 +241,7 @@ def render(script, timing, wav, out_mp4, cfg, bg_dir=None):
     W, H, fps = v["width"], v["height"], v["fps"]
     bg = pick_background(bg_dir)
     cards = make_cards(script)
+    _, line_group = groups_of(script)
     static = overlay_static(W, script, cfg["channel_name"])
     n = len(cards)
     starts = [max(0.0, t["start"] - 0.1) for t in timing["lines"]][:n]
@@ -210,9 +256,31 @@ def render(script, timing, wav, out_mp4, cfg, bg_dir=None):
         s = max_card_h / card.height
         return card.resize((int(card.width * s), max_card_h), Image.LANCZOS)
 
+    # cùng một nhóm dùng chung một tỉ lệ thu nhỏ, để phần trên của thẻ không co lại khi thêm câu trả lời
+    scale = {}
+    for k, c in enumerate(cards):
+        g = line_group[k]
+        scale[g] = min(scale.get(g, 1.0), max_card_h / c.height if c.height > max_card_h else 1.0)
+    cards = [c if scale[line_group[k]] >= 1 else c.resize((int(c.width * scale[line_group[k]]), int(c.height * scale[line_group[k]])), Image.LANCZOS)
+             for k, c in enumerate(cards)]
     cards = [fit(c) for c in cards]
 
+    def frame_grow(k, a):
+        """Câu trả lời mới trong cùng thẻ: giữ thẻ cũ, phần mới hiện dần bên dưới."""
+        img = static.copy()
+        prev, c = cards[k - 1], cards[k].copy()
+        x = (W - c.width) // 2
+        img.alpha_composite(prev, ((W - prev.width) // 2, CARD_TOP))
+        c.putalpha(c.getchannel("A").point(lambda p: int(p * a)))
+        img.alpha_composite(c, (x, CARD_TOP))
+        dr = ImageDraw.Draw(img)
+        yb = CARD_TOP + prev.height + (cards[k].height - prev.height) * a + 46
+        text_shadow(dr, (W / 2, yb), "@" + clean(channel_handle(cfg)), wm_font, (255, 255, 255, 170))
+        return img.tobytes()
+
     def frame_for(k, a):
+        if a < 1 and k > 0 and line_group[k] == line_group[k - 1]:
+            return frame_grow(k, a)
         img = static.copy()
         c = cards[k]
         if a < 1:
