@@ -30,7 +30,7 @@ Khi bật **Tự động**, CommentKit quét inbox 30 giây một lần. Với m
 4. Dựng video 1080×1920, dài khoảng 45-60 giây: gameplay phủ kín màn hình, mỗi lúc một thẻ, đổi thẻ đúng lúc giọng đọc tới câu đó. Câu trả lời của trả lời nằm chung thẻ với bình luận được trả lời (như Threads) và hiện ra sau khi bình luận đó đọc xong.
 5. Ảnh đã đọc chuyển sang `inbox/_done`, nên không bị đọc lại. Ảnh lỗi chuyển sang `inbox/_failed`, bấm **Thử lại** để chạy lại.
 
-**Tự sáng tác:** chọn chủ đề (để ngẫu nhiên, hoặc gõ chủ đề riêng) rồi bấm **Sáng tác**. Tool cũng có thể tự sáng tác khi inbox trống, có giới hạn số video mỗi ngày. Các ý đã làm được ghi nhớ để không lặp lại.
+**Tự sáng tác:** chọn chủ đề (để ngẫu nhiên, hoặc gõ chủ đề riêng) rồi bấm **Sáng tác**. Tool cũng có thể tự sáng tác khi inbox trống, có giới hạn số video mỗi ngày. Các ý đã làm được ghi nhớ để không lặp lại. Khi bật **Chèn meme vào bình luận**, AI chọn meme hợp ngữ cảnh cho 2-3 bình luận (gần 70 meme phổ biến từ Imgflip, cộng meme của bạn) và tool ghép chữ tiếng Việt lên meme. Bấm **Meme của tôi** để thêm meme riêng, ví dụ meme Việt: đặt tên file nói meme đó là gì, như `meo-ngac-nhien.jpg`.
 
 Mỗi video nằm trong một thư mục riêng trong `output/`: `video.mp4`, ảnh thumbnail, `script.json` và `metadata.json`. Trên app, nút **Chép tiêu đề** và **Chép mô tả** chép sẵn chữ để đăng YouTube. Nút **Xoá** chuyển cả thư mục của video vào Thùng rác.
 

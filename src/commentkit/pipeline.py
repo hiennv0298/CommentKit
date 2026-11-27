@@ -9,7 +9,7 @@ from .llm import AuthError, LLMError  # noqa: F401
 from .render import render
 from .crop import blur_boxes, detect_photos
 from .paths import NO_WINDOW, PKG, home
-from . import voice
+from . import memes, voice
 
 ROOT = str(home())   # thư mục dữ liệu (xem paths.home)
 IMG_EXT = (".png", ".jpg", ".jpeg", ".webp")
@@ -26,6 +26,7 @@ DEFAULT_SETTINGS = dict(
     compose_per_day=3,
     check_updates=True,          # tự kiểm tra bản mới trên GitHub
     blur_names=True,             # AI dò tên người / @username / số điện thoại trong hình rồi làm mờ
+    compose_memes=True,          # tự sáng tác: AI chèn meme vào 2-3 bình luận
     yt_auto=False,               # tự đăng video mới làm xong lên YouTube
     yt_privacy="private",        # private | unlisted | public | schedule (hẹn giờ theo khung)
     yt_slots="11:30, 20:00",     # khung giờ đăng khi hẹn giờ
@@ -449,13 +450,41 @@ def composed_today():
     return sum(1 for h in load_history() if str(h.get("at", "")).startswith(today))
 
 
+def attach_memes(script, log=print):
+    """Ghép ảnh meme cho những bình luận AI chọn meme. Trả về danh sách id meme đã dùng."""
+    used = []
+    for k, c in enumerate(script.get("comments", [])):
+        m = c.pop("meme", None)
+        if not isinstance(m, dict) or not m.get("id") or c.get("image"):
+            continue
+        path = os.path.join(ROOT, "state", f"_photo_meme_{os.getpid()}_{k}.png")
+        try:
+            out = memes.render(m["id"], path, str(m.get("caption") or ""), [str(p) for p in m.get("panels") or []] or None)
+        except Exception as e:  # noqa: BLE001 - meme lỗi thì bình luận vẫn là chữ
+            log(f"  ! không ghép được meme {m['id']}: {e}")
+            continue
+        if out:
+            c["image"] = out
+            used.append(str(m["id"]))
+            log(f"  ghép meme cho bình luận {k + 1}: {m['id']}")
+    return used
+
+
 def compose_one(cfg, settings, log=print, topic=None):
     """LLM tự nghĩ ra một bài + bình luận, rồi dựng video. Trả về thư mục output (hoặc None nếu bỏ qua/lỗi)."""
     provider = settings.get("provider_compose", "claude")
     hist = load_history()
     log(f"✎ Sáng tác bằng {provider}{' (chủ đề: ' + topic + ')' if topic else ''}...")
+    meme_list = []
+    if settings.get("compose_memes", True):
+        try:
+            meme_list = memes.catalog()
+        except Exception as e:  # noqa: BLE001 - không có meme thì vẫn sáng tác
+            log(f"  ! không lấy được danh sách meme: {e}")
+    recent = [m for h in hist[-12:] for m in h.get("memes", [])]
     try:
-        script = write_script_original(cfg, [h.get("summary") or h.get("hook", "") for h in hist], provider, topic)
+        script = write_script_original(cfg, [h.get("summary") or h.get("hook", "") for h in hist], provider, topic,
+                                       memes.catalog_text(meme_list, recent) if meme_list else None)
     except AuthError:
         raise
     except (LLMError, RuntimeError) as e:
@@ -465,13 +494,14 @@ def compose_one(cfg, settings, log=print, topic=None):
         log("⤼ bỏ qua:", script.get("reason"))
         return None
     log(f"  chủ đề '{script['topic']}': {script.get('hook')}")
+    used = attach_memes(script, log) if meme_list else []
     try:
         out_dir, meta = make_video(script, cfg, settings, "sangtac-" + slug(script["topic"]), log)
     except Exception as e:  # noqa
         log(f"✖ dựng video lỗi: {e}")
         return None
     hist.append(dict(at=datetime.now().isoformat(timespec="seconds"), topic=script["topic"], hook=script.get("hook"),
-                     summary=script.get("summary"), provider=provider, output=out_dir))
+                     summary=script.get("summary"), provider=provider, output=out_dir, memes=used))
     os.makedirs(os.path.dirname(HISTORY_PATH), exist_ok=True)
     json.dump(hist, open(HISTORY_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     log(f"✔ sáng tác xong: {meta.get('title')}")

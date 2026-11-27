@@ -79,7 +79,7 @@ def syllables(data):
     return sum(len(str(x.get("tts") or x.get("text") or "").split()) for x in [data.get("post") or {}] + list(data.get("comments") or []))
 
 
-EXTEND_TASK = """Kịch bản JSON dưới đây quá ngắn: {have} chữ, cần khoảng {syl_min}-{syl_max} chữ (tính theo trường "tts") để video dài {sec_min}-{sec_max} giây. Giữ nguyên bài đăng và các bình luận đang có (giữ "reply_to", "image"), THÊM vài bình luận hài mới cho đủ độ dài, đúng mọi quy tắc ở trên, bình luận cuối vẫn là cú chốt hài nhất. Trả về DUY NHẤT JSON đầy đủ.
+EXTEND_TASK = """Kịch bản JSON dưới đây quá ngắn: {have} chữ, cần khoảng {syl_min}-{syl_max} chữ (tính theo trường "tts") để video dài {sec_min}-{sec_max} giây. Giữ nguyên bài đăng và các bình luận đang có (giữ "reply_to", "image", "meme"), THÊM vài bình luận hài mới cho đủ độ dài, đúng mọi quy tắc ở trên, bình luận cuối vẫn là cú chốt hài nhất. Trả về DUY NHẤT JSON đầy đủ.
 
 {script}
 """
@@ -192,11 +192,25 @@ def write_script_from_images(images, cfg, job_name="job", provider="claude", pos
     return _ensure_length(data, cfg, provider, _rules(cfg, job_name), raw)
 
 
-def write_script_original(cfg, history, provider="claude", topic=None):
+MEME_TASK = """MEME: chọn 2-3 bình luận để kèm một meme (mỗi bình luận một meme KHÁC nhau), lấy từ danh sách dưới \
+đây, dùng đúng id. Meme phải hợp ngữ cảnh và làm câu bình luận hài hơn (người bình luận "thả meme" như trên Threads); \
+chữ của bình luận đó vẫn phải có nghĩa khi đọc lên. Thêm vào bình luận:
+  + meme "chú thích phía trên": "meme": {{"id": "<id>", "caption": "<câu ngắn tối đa 12 từ viết trên hình, kiểu 'Khi...' \
+hoặc 'Tôi lúc...', hoặc \"\" nếu chữ bình luận đã đủ>"}}
+  + meme "chữ vào N ô" (vd Drake: ô 1 là thứ chê, ô 2 là thứ thích): "meme": {{"id": "<id>", "panels": ["ô 1", "ô 2"]}}, mỗi ô tối đa 8 từ.
+Ưu tiên meme riêng của kênh khi hợp. KHÔNG chọn meme có ghi [vừa dùng, tránh]. Chữ trên meme viết tiếng Việt.
+DANH SÁCH MEME (id | tên | cách ghép chữ):
+{memes}
+
+"""
+
+
+def write_script_original(cfg, history, provider="claude", topic=None, memes_text=None):
     topics = cfg.get("compose", {}).get("topics") or ["đi làm"]
     topic = topic or random.choice(topics)
     hist = "\n".join(f"- {h}" for h in history[-60:]) or "- (chưa có)"
-    prompt = COMPOSE_TASK.format(topic=topic, history=hist) + _rules(
+    meme_part = MEME_TASK.format(memes=memes_text) if memes_text else ""
+    prompt = COMPOSE_TASK.format(topic=topic, history=hist) + meme_part + _rules(
         cfg, "compose", disclaimer="ghi chú: truyện hư cấu, giọng đọc AI")
     raw = generate(prompt, cfg, provider)
     data = _ensure_length(_validate(_extract_json(raw), cfg, raw), cfg, provider, prompt, raw)

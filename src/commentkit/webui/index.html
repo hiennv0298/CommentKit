@@ -135,6 +135,8 @@ button.danger:hover{filter:brightness(1.08)}
       <input class="t" id="topicCustom" placeholder="…hoặc gõ chủ đề riêng" style="margin-top:8px">
       <div class="opts" style="align-items:center">
         <label class="sw"><input type="checkbox" id="compAuto"><i></i>Tự sáng tác khi inbox trống</label>
+        <label class="sw" title="AI chọn meme hợp ngữ cảnh cho 2-3 bình luận"><input type="checkbox" id="compMemes"><i></i>Chèn meme vào bình luận</label>
+        <button class="sm" data-open="memes" title="Bỏ meme của riêng bạn vào đây, tên file nói meme đó là gì">Meme của tôi</button>
         <span>tối đa <input class="t" id="compPerDay" type="number" min="0" style="width:60px;display:inline-block;padding:4px 6px"> video/ngày</span>
       </div>
     </div>
@@ -307,6 +309,7 @@ async function refresh(){
   }
   $("#nComp").textContent = `hôm nay ${s.composed_today}/${s.settings.compose_per_day}` + (s.compose_queue ? ` · chờ ${s.compose_queue}` : "");
   $("#compAuto").checked = !!s.settings.compose_auto;
+  $("#compMemes").checked = s.settings.compose_memes !== false;
   if (document.activeElement !== $("#compPerDay")) $("#compPerDay").value = s.settings.compose_per_day;
   $("#keyState").textContent = s.openai_key ? "(đã có key, nhập để thay)" : "(chưa có)";
   $("#gKeyState").textContent = s.gemini_key ? "(đã có key, nhập để thay)" : "(chưa có)";
@@ -406,6 +409,7 @@ const doCompose = async () => {
 };
 $("#compose").onclick = doCompose; $("#composeTop").onclick = doCompose;
 $("#compAuto").onchange = e => post("/api/settings", {compose_auto:e.target.checked}).then(refresh);
+$("#compMemes").onchange = e => post("/api/settings", {compose_memes:e.target.checked}).then(refresh);
 $("#compPerDay").onchange = e => post("/api/settings", {compose_per_day:+e.target.value}).then(refresh);
 $("#bgAdd").onclick = () => $("#bgFile").click();
 $("#bgFile").onchange = async e => {

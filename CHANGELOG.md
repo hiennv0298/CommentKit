@@ -3,6 +3,13 @@
 Mục của mỗi phiên bản là ghi chú phát hành trên trang GitHub Releases.
 Thêm mục `## <phiên bản>` ở đây trước khi đẩy tag `v<phiên bản>`.
 
+## 0.1.7
+
+- **Meme trong bình luận khi tự sáng tác.** AI chọn meme hợp ngữ cảnh cho 2-3 bình luận, mỗi bình luận một meme khác nhau, và tránh meme vừa dùng ở các video gần đây. Tool ghép chữ tiếng Việt: thanh chú thích phía trên hình (meme phản ứng), hoặc chữ vào 2 ô với Drake.
+- Nguồn meme: gần 70 meme phổ biến từ Imgflip (danh sách cập nhật hằng tuần, ảnh tải khi cần), cộng **meme của riêng bạn**: bấm **Meme của tôi** ở mục Tự sáng tác, bỏ ảnh vào, đặt tên file nói meme đó là gì (vd `meo-ngac-nhien.jpg`).
+- Bật/tắt bằng ô **Chèn meme vào bình luận**.
+- Hình và meme trong thẻ hiển thị lớn hơn, dễ xem trên điện thoại.
+
 ## 0.1.6
 
 - **Ảnh đặt tên "post" là bài gốc.** Đặt tên ảnh chụp bài gốc có chữ `post` (vd `post.png`, `Post_1.jpg`) thì tool dùng chắc chắn bài đó làm chủ đề câu chuyện và cắt hình/meme trong ảnh đó làm hình của bài, không để AI đoán.

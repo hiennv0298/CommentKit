@@ -22,7 +22,7 @@ from flask import Flask, abort, jsonify, request, send_from_directory
 from werkzeug.serving import make_server
 from werkzeug.utils import secure_filename
 
-from . import __version__, pipeline as P, updates, voice, youtube
+from . import __version__, memes, pipeline as P, updates, voice, youtube
 from .llm import has_gemini_key, has_openai_key, set_env
 from .paths import PKG, add_bundled_tools, home
 from .render import VIDEO_EXT
@@ -331,6 +331,8 @@ def set_settings():
             W.settings[k] = body[k]
     if "compose_auto" in body:
         W.settings["compose_auto"] = bool(body["compose_auto"])
+    if "compose_memes" in body:
+        W.settings["compose_memes"] = bool(body["compose_memes"])
     if "compose_per_day" in body:
         W.settings["compose_per_day"] = max(0, int(body["compose_per_day"]))
     if body.get("openai_key"):
@@ -536,7 +538,7 @@ def open_folder():
     body = request.json or {}
     kind, name = body.get("kind"), os.path.basename(body.get("name", ""))
     base = {"output": W.settings["output_dir"], "inbox": W.settings["inbox_dir"], "bg": W.settings["bg_dir"],
-            "home": str(home())}.get(kind)
+            "home": str(home()), "memes": str(memes.user_dir())}.get(kind)
     if not base:
         abort(400)
     p = os.path.join(base, name) if name else base

@@ -74,7 +74,7 @@ class Layout:
         photo = None
         if d.get("image") and os.path.exists(d["image"]):     # hình/meme của bài gốc
             im = Image.open(d["image"]).convert("RGB")
-            mw, mh = self.W - x_text - 52, 460
+            mw, mh = self.W - x_text - 52, 640    # hình/meme to, dễ xem trên điện thoại
             s = min(mw / im.width, mh / im.height)
             photo = im.resize((max(1, int(im.width * s)), max(1, int(im.height * s))), Image.LANCZOS)
         h = (18 if nested else 34) + 54 + len(lines) * lh + (photo.height + 18 if photo else 0) + 80 + 18
